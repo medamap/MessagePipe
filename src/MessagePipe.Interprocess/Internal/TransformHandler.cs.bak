@@ -1,6 +1,6 @@
 ﻿using MessagePack;
 using System.Threading;
-using Cysharp.Threading.Tasks;
+using System.Threading.Tasks;
 
 namespace MessagePipe.Interprocess.Internal
 {
@@ -15,7 +15,7 @@ namespace MessagePipe.Interprocess.Internal
             this.options = options;
         }
 
-        public UniTask HandleAsync(IInterprocessValue message, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInterprocessValue message, CancellationToken cancellationToken)
         {
             var msg = MessagePackSerializer.Deserialize<TMessage>(message.ValueMemory, options);
             handler.Handle(msg);
@@ -34,7 +34,7 @@ namespace MessagePipe.Interprocess.Internal
             this.options = options;
         }
 
-        public UniTask HandleAsync(IInterprocessValue message, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInterprocessValue message, CancellationToken cancellationToken)
         {
             var msg = MessagePackSerializer.Deserialize<TMessage>(message.ValueMemory, options);
             return handler.HandleAsync(msg, cancellationToken);

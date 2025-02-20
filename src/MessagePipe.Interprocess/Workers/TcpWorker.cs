@@ -8,7 +8,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -32,7 +32,7 @@ namespace MessagePipe.Interprocess.Workers
 
         // request-response
         int messageId = 0;
-        ConcurrentDictionary<int, TaskCompletionSource<IInterprocessValue>> responseCompletions = new ConcurrentDictionary<int, TaskCompletionSource<IInterprocessValue>>();
+        ConcurrentDictionary<int, UniTaskCompletionSource<IInterprocessValue>> responseCompletions = new ConcurrentDictionary<int, UniTaskCompletionSource<IInterprocessValue>>();
 
         // create from DI
         [Preserve]
@@ -117,7 +117,7 @@ namespace MessagePipe.Interprocess.Workers
             channel.Writer.TryWrite(buffer);
         }
 
-        public async ValueTask<TResponse> RequestAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken)
+        public async UniTask<TResponse> RequestAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken)
         {
             if (Interlocked.Increment(ref initializedClient) == 1) // first incr, channel not yet started
             {
@@ -126,7 +126,7 @@ namespace MessagePipe.Interprocess.Workers
             }
 
             var mid = Interlocked.Increment(ref messageId);
-            var tcs = new TaskCompletionSource<IInterprocessValue>();
+            var tcs = new UniTaskCompletionSource<IInterprocessValue>();
             responseCompletions[mid] = tcs;
             var buffer = MessageBuilder.BuildRemoteRequestMessage(typeof(TRequest), typeof(TResponse), mid, request, options.MessagePackSerializerOptions);
             channel.Writer.TryWrite(buffer);
@@ -271,17 +271,17 @@ namespace MessagePipe.Interprocess.Workers
                                     var genericArgs = interfaceType.GetGenericArguments(); // [TRequest, TResponse]
                                     // Unity IL2CPP does not work(can not invoke nongenerics MessagePackSerializer)
                                     var request = MessagePackSerializer.Deserialize(genericArgs[0], message.ValueMemory, options.MessagePackSerializerOptions);
-                                    var responseTask = coreInterfaceType.GetMethod("InvokeAsync")!.Invoke(service, new[] { request, CancellationToken.None });
+                                    var responseTask = coreInterfaceType.GetMethod("InvokeAsync").Invoke(service, new[] { request, CancellationToken.None });
 #if !UNITY_2018_3_OR_NEWER
-                                    var task = typeof(ValueTask<>).MakeGenericType(genericArgs[1]).GetMethod("AsTask")!.Invoke(responseTask, null);
+                                    var task = typeof(UniTask<>).MakeGenericType(genericArgs[1]).GetMethod("AsTask").Invoke(responseTask, null);
 #else
                                     var asTask = typeof(UniTaskExtensions).GetMethods().First(x => x.IsGenericMethod && x.Name == "AsTask")
                                         .MakeGenericMethod(genericArgs[1]);
                                     var task = asTask.Invoke(null, new[] { responseTask });
 #endif
-                                    await ((System.Threading.Tasks.Task)task!); // Task<T> -> Task
-                                    var result = task.GetType().GetProperty("Result")!.GetValue(task);
-                                    resultBytes = MessageBuilder.BuildRemoteResponseMessage(mid, genericArgs[1], result!, options.MessagePackSerializerOptions);
+                                    await ((System.Threading.Tasks.Task)task); // Task<T> -> Task
+                                    var result = task.GetType().GetProperty("Result").GetValue(task);
+                                    resultBytes = MessageBuilder.BuildRemoteResponseMessage(mid, genericArgs[1], result, options.MessagePackSerializerOptions);
                                 }
                                 catch (Exception ex)
                                 {
@@ -333,7 +333,7 @@ namespace MessagePipe.Interprocess.Workers
             return MessagePackSerializer.Deserialize<T>(buffer, options);
         }
 
-        static async ValueTask ReadFullyAsync(byte[] buffer, SocketTcpClient client, int index, int remain, CancellationToken token)
+        static async UniTask ReadFullyAsync(byte[] buffer, SocketTcpClient client, int index, int remain, CancellationToken token)
         {
             while (remain > 0)
             {

@@ -1,9 +1,9 @@
 ﻿using System;
-using Cysharp.Threading.Tasks;
+using System.Threading.Tasks;
 
 namespace MessagePipe.Interprocess.Internal
 {
-    internal sealed class AsyncDisposableBridge : IUniTaskAsyncDisposable
+    internal sealed class AsyncDisposableBridge : IAsyncDisposable
     {
         readonly IDisposable disposable;
 
@@ -12,7 +12,7 @@ namespace MessagePipe.Interprocess.Internal
             this.disposable = disposable;
         }
 
-        public UniTask DisposeAsync()
+        public ValueTask DisposeAsync()
         {
             disposable.Dispose();
             return default;

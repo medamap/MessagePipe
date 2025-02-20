@@ -38,7 +38,7 @@ namespace MessagePipe.Interprocess
         public ReadOnlyMemory<byte> KeyMemory => buffer.AsMemory(keyIndex, keyOffset - keyIndex);
         public ReadOnlyMemory<byte> ValueMemory => buffer.AsMemory(keyOffset, buffer.Length - keyOffset);
 
-        public bool Equals(IInterprocessKey other)
+        public bool Equals(IInterprocessKey? other)
         {
             if (other == null) return false;
             return KeyMemory.Span.SequenceEqual(other.KeyMemory.Span);
@@ -111,7 +111,7 @@ namespace MessagePipe.Interprocess
                 var writer = new MessagePackWriter(bufferWriter);
                 writer.WriteArrayHeader(3);
                 writer.Write((byte)MessageType.RemoteRequest);
-                MessagePackSerializer.Serialize(ref writer, new RequestHeader(messageId, requestType.FullName, responseType.FullName), options);
+                MessagePackSerializer.Serialize(ref writer, new RequestHeader(messageId, requestType.FullName!, responseType.FullName!), options);
                 MessagePackSerializer.Serialize(ref writer, message, options);
                 writer.Flush();
 

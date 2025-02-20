@@ -2,7 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using Cysharp.Threading.Tasks;
+using System.Threading.Tasks;
 
 namespace MessagePipe.Interprocess.Workers
 {
@@ -41,13 +41,13 @@ namespace MessagePipe.Interprocess.Workers
         }
 #endif
 
-        public async UniTask<ReadOnlyMemory<byte>> ReceiveAsync(CancellationToken cancellationToken)
+        public async ValueTask<ReadOnlyMemory<byte>> ReceiveAsync(CancellationToken cancellationToken)
         {
 #if NET5_0_OR_GREATER
             var i = await socket.ReceiveAsync(buffer, SocketFlags.None, cancellationToken).ConfigureAwait(false);
             return buffer.AsMemory(0, i);
 #else
-            var tcs = new UniTaskCompletionSource<ReadOnlyMemory<byte>>();
+            var tcs = new TaskCompletionSource<ReadOnlyMemory<byte>>();
 
             socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, x =>
             {
@@ -112,12 +112,12 @@ namespace MessagePipe.Interprocess.Workers
         }
 #endif
 
-        public UniTask<int> SendAsync(byte[] buffer, CancellationToken cancellationToken = default)
+        public ValueTask<int> SendAsync(byte[] buffer, CancellationToken cancellationToken = default)
         {
 #if NET5_0_OR_GREATER
             return socket.SendAsync(buffer, SocketFlags.None, cancellationToken);
 #else
-            var tcs = new UniTaskCompletionSource<int>();
+            var tcs = new TaskCompletionSource<int>();
             socket.BeginSend(buffer, 0, buffer.Length, SocketFlags.None, x =>
              {
                  int i;
@@ -133,7 +133,7 @@ namespace MessagePipe.Interprocess.Workers
                  tcs.TrySetResult(i);
              }, null);
 #if !UNITY_2018_3_OR_NEWER
-            return new UniTask<int>(tcs.Task);
+            return new ValueTask<int>(tcs.Task);
 #else
             return tcs.Task;
 #endif

@@ -2,7 +2,7 @@
 using MessagePipe.Interprocess.Workers;
 using System;
 using System.Threading;
-using Cysharp.Threading.Tasks;
+using System.Threading.Tasks;
 
 namespace MessagePipe.Interprocess
 {
@@ -17,7 +17,7 @@ namespace MessagePipe.Interprocess
             this.worker = worker;
         }
 
-        public UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = default)
+        public ValueTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = default)
         {
             worker.Publish(key, message);
             return default;
@@ -55,35 +55,35 @@ namespace MessagePipe.Interprocess
             worker.StartReceiver();
         }
 #endif
-        public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, CancellationToken cancellationToken = default)
+        public ValueTask<IAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, CancellationToken cancellationToken = default)
         {
             return SubscribeAsync(key, handler, Array.Empty<MessageHandlerFilter<TMessage>>(), cancellationToken);
         }
 
-        public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, MessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
+        public ValueTask<IAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, MessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
         {
             handler = syncHandlerFactory.CreateMessageHandler(handler, filters);
             var transform = new TransformSyncMessageHandler<TMessage>(handler, options.MessagePackSerializerOptions);
             return SubscribeCore(key, transform);
         }
 
-        public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, CancellationToken cancellationToken = default)
+        public ValueTask<IAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, CancellationToken cancellationToken = default)
         {
             return SubscribeAsync(key, handler, Array.Empty<AsyncMessageHandlerFilter<TMessage>>(), cancellationToken);
         }
 
-        public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, AsyncMessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
+        public ValueTask<IAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, AsyncMessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
         {
             handler = asyncHandlerFactory.CreateAsyncMessageHandler(handler, filters);
             var transform = new TransformAsyncMessageHandler<TMessage>(handler, options.MessagePackSerializerOptions);
             return SubscribeCore(key, transform);
         }
 
-        UniTask<IUniTaskAsyncDisposable> SubscribeCore(TKey key, IAsyncMessageHandler<IInterprocessValue> handler)
+        ValueTask<IAsyncDisposable> SubscribeCore(TKey key, IAsyncMessageHandler<IInterprocessValue> handler)
         {
             var byteKey = MessageBuilder.CreateKey(key, options.MessagePackSerializerOptions);
             var d = subscriberCore.Subscribe(byteKey, handler);
-            return new UniTask<IUniTaskAsyncDisposable>(new AsyncDisposableBridge(d));
+            return new ValueTask<IAsyncDisposable>(new AsyncDisposableBridge(d));
         }
     }
 

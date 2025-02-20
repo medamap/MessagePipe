@@ -6,52 +6,51 @@ using System.Threading.Channels;
 #endif
 using System;
 using System.Collections.Concurrent;
-using System.IO;
-using System.IO.Pipes;
 using System.Linq;
 using System.Threading;
-using Cysharp.Threading.Tasks;
+using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace MessagePipe.Interprocess.Workers
 {
     [Preserve]
-    public sealed class NamedPipeWorker : IDisposable
+    public sealed class TcpWorker : IDisposable
     {
-        readonly string pipeName;
         readonly IServiceProvider provider;
         readonly CancellationTokenSource cancellationTokenSource;
         readonly IAsyncPublisher<IInterprocessKey, IInterprocessValue> publisher;
-        readonly MessagePipeInterprocessNamedPipeOptions options;
+        readonly MessagePipeInterprocessOptions options;
 
         // Channel is used from publisher for thread safety of write packet
         int initializedServer = 0;
-        Lazy<NamedPipeServerStream> server;
+        Lazy<SocketTcpServer> server;
         Channel<byte[]> channel;
 
         int initializedClient = 0;
-        Lazy<NamedPipeClientStream> client;
+        Lazy<SocketTcpClient> client;
 
         // request-response
         int messageId = 0;
-        ConcurrentDictionary<int, UniTaskCompletionSource<IInterprocessValue>> responseCompletions = new ConcurrentDictionary<int, UniTaskCompletionSource<IInterprocessValue>>();
+        ConcurrentDictionary<int, TaskCompletionSource<IInterprocessValue>> responseCompletions = new ConcurrentDictionary<int, TaskCompletionSource<IInterprocessValue>>();
 
         // create from DI
         [Preserve]
-        public NamedPipeWorker(IServiceProvider provider, MessagePipeInterprocessNamedPipeOptions options, IAsyncPublisher<IInterprocessKey, IInterprocessValue> publisher)
+        public TcpWorker(IServiceProvider provider, MessagePipeInterprocessTcpOptions options, IAsyncPublisher<IInterprocessKey, IInterprocessValue> publisher)
         {
-            this.pipeName = options.PipeName;
             this.provider = provider;
             this.cancellationTokenSource = new CancellationTokenSource();
             this.options = options;
             this.publisher = publisher;
 
-            this.server = CreateLazyServerStream();
-
-            this.client = new Lazy<NamedPipeClientStream>(() =>
+            this.server = new Lazy<SocketTcpServer>(() =>
             {
-                return new NamedPipeClientStream(options.ServerName, options.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+                return SocketTcpServer.Listen(options.Host, options.Port);
+            });
+
+            this.client = new Lazy<SocketTcpClient>(() =>
+            {
+                return SocketTcpClient.Connect(options.Host, options.Port);
             });
 
 #if !UNITY_2018_3_OR_NEWER
@@ -70,12 +69,42 @@ namespace MessagePipe.Interprocess.Workers
                 StartReceiver();
             }
         }
-
-        Lazy<NamedPipeServerStream> CreateLazyServerStream()
+#if NET5_0_OR_GREATER
+        [Preserve]
+        public TcpWorker(IServiceProvider provider, MessagePipeInterprocessTcpUdsOptions options, IAsyncPublisher<IInterprocessKey, IInterprocessValue> publisher)
         {
-            return new Lazy<NamedPipeServerStream>(() => new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous));
-        }
+            this.provider = provider;
+            this.cancellationTokenSource = new CancellationTokenSource();
+            this.options = options;
+            this.publisher = publisher;
 
+            this.server = new Lazy<SocketTcpServer>(() =>
+            {
+                return SocketTcpServer.ListenUds(options.SocketPath);
+            });
+
+            this.client = new Lazy<SocketTcpClient>(() =>
+            {
+                return SocketTcpClient.ConnectUds(options.SocketPath);
+            });
+
+#if !UNITY_2018_3_OR_NEWER
+            this.channel = Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions()
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                AllowSynchronousContinuations = true
+            });
+#else
+            this.channel = Channel.CreateSingleConsumerUnbounded<byte[]>();
+#endif
+
+            if (options.HostAsServer != null && options.HostAsServer.Value)
+            {
+                StartReceiver();
+            }
+        }
+#endif
         public void Publish<TKey, TMessage>(TKey key, TMessage message)
         {
             if (Interlocked.Increment(ref initializedClient) == 1) // first incr, channel not yet started
@@ -88,7 +117,7 @@ namespace MessagePipe.Interprocess.Workers
             channel.Writer.TryWrite(buffer);
         }
 
-        public async UniTask<TResponse> RequestAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken)
+        public async ValueTask<TResponse> RequestAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken)
         {
             if (Interlocked.Increment(ref initializedClient) == 1) // first incr, channel not yet started
             {
@@ -97,7 +126,7 @@ namespace MessagePipe.Interprocess.Workers
             }
 
             var mid = Interlocked.Increment(ref messageId);
-            var tcs = new UniTaskCompletionSource<IInterprocessValue>();
+            var tcs = new TaskCompletionSource<IInterprocessValue>();
             responseCompletions[mid] = tcs;
             var buffer = MessageBuilder.BuildRemoteRequestMessage(typeof(TRequest), typeof(TResponse), mid, request, options.MessagePackSerializerOptions);
             channel.Writer.TryWrite(buffer);
@@ -105,41 +134,13 @@ namespace MessagePipe.Interprocess.Workers
             return MessagePackSerializer.Deserialize<TResponse>(memoryValue.ValueMemory, options.MessagePackSerializerOptions);
         }
 
-        public void StartReceiver()
-        {
-            if (Interlocked.Increment(ref initializedServer) == 1) // first incr, channel not yet started
-            {
-                RunReceiveLoop(server.Value, x =>
-                {
-#if !UNITY_2018_3_OR_NEWER
-                    return server.Value.WaitForConnectionAsync(x);
-#else
-                    return System.Threading.Tasks.Task.Run(()=> server.Value.WaitForConnection(), x);
-#endif
-                });
-            }
-        }
-
-        // Send packet to udp socket from publisher
+        // Send packet to tcp socket from publisher
         async void RunPublishLoop()
         {
             var reader = channel.Reader;
             var token = cancellationTokenSource.Token;
-            var pipeStream = client.Value;
-
-            try
-            {
-#if !UNITY_2018_3_OR_NEWER
-                await pipeStream.ConnectAsync(Timeout.Infinite, token).ConfigureAwait(false);
-#else
-                await System.Threading.Tasks.Task.Run(() => pipeStream.Connect(), token);
-#endif
-            }
-            catch (IOException)
-            {
-                return; // connection closed.
-            }
-            RunReceiveLoop(pipeStream, null); // client connected, setup receive loop
+            var tcpClient = client.Value;
+            RunReceiveLoop(tcpClient); // also setup receive loop
 
             while (await reader.WaitToReadAsync(token).ConfigureAwait(false))
             {
@@ -147,11 +148,7 @@ namespace MessagePipe.Interprocess.Workers
                 {
                     try
                     {
-                        await pipeStream.WriteAsync(item, 0, item.Length, token).ConfigureAwait(false);
-                    }
-                    catch (IOException)
-                    {
-                        return; // connection closed.
+                        await tcpClient.SendAsync(item, token).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
@@ -166,60 +163,78 @@ namespace MessagePipe.Interprocess.Workers
             }
         }
 
-        // Receive from udp socket and push value to subscribers.
-        async void RunReceiveLoop(Stream pipeStream, Func<CancellationToken, System.Threading.Tasks.Task> waitForConnection)
+        public void StartReceiver()
         {
-        RECONNECT:
-            var token = cancellationTokenSource.Token;
-            if (waitForConnection != null)
+            if (Interlocked.Increment(ref initializedServer) == 1) // first incr, channel not yet started
             {
-                try
-                {
-                    await waitForConnection(token).ConfigureAwait(false);
-                }
-                catch (IOException)
-                {
-                    return; // connection closed.
-                }
+                var s = server.Value; // init
+                s.StartAcceptLoopAsync(RunReceiveLoop, cancellationTokenSource.Token);
             }
+        }
+
+        // Receive from tcp socket and push value to subscribers.
+        async void RunReceiveLoop(SocketTcpClient client)
+        {
+            var token = cancellationTokenSource.Token;
             var buffer = new byte[65536];
+            ReadOnlyMemory<byte> readBuffer = Array.Empty<byte>();
             while (!token.IsCancellationRequested)
             {
                 ReadOnlyMemory<byte> value = Array.Empty<byte>();
                 try
                 {
-                    var readLen = await pipeStream.ReadAsync(buffer, 0, buffer.Length, token).ConfigureAwait(false);
-                    if (readLen == 0)
+                    if (readBuffer.Length == 0)
                     {
-                        if (waitForConnection != null)
-                        {
-                            server.Value.Dispose();
-                            server = CreateLazyServerStream();
-                            pipeStream = server.Value;
-                            goto RECONNECT; // end of stream(disconnect, wait reconnect)
-                        }
+                        var readLen = await client.ReceiveAsync(buffer, 0, buffer.Length, token).ConfigureAwait(false);
+                        if (readLen == 0) return; // end of stream(disconnect)
+                        readBuffer = buffer.AsMemory(0, readLen);
+                    }
+                    else if (readBuffer.Length < 4) // rare case
+                    {
+                        var readLen = await client.ReceiveAsync(buffer, 0, buffer.Length, token).ConfigureAwait(false);
+                        if (readLen == 0) return;
+                        var newBuffer = new byte[readBuffer.Length + readLen];
+                        readBuffer.CopyTo(newBuffer);
+                        buffer.AsSpan(readLen).CopyTo(newBuffer.AsSpan(readBuffer.Length));
+                        readBuffer = newBuffer;
                     }
 
-                    var messageLen = MessageBuilder.FetchMessageLength(buffer);
-                    if (readLen == (messageLen + 4))
+                    var messageLen = MessageBuilder.FetchMessageLength(readBuffer.Span);
+                    if (readBuffer.Length == (messageLen + 4)) // just size
                     {
-                        value = buffer.AsMemory(4, messageLen); // skip length header
+                        value = readBuffer.Slice(4, messageLen); // skip length header
+                        readBuffer = Array.Empty<byte>();
+                        goto PARSE_MESSAGE;
                     }
-                    else
+                    else if (readBuffer.Length > (messageLen + 4)) // over size
                     {
-                        // read more
-                        if (buffer.Length < (messageLen + 4))
+                        value = readBuffer.Slice(4, messageLen);
+                        readBuffer = readBuffer.Slice(messageLen + 4);
+                        goto PARSE_MESSAGE;
+                    }
+                    else // needs to read more
+                    {
+                        var readLen = readBuffer.Length;
+                        if (readLen < (messageLen + 4))
                         {
-                            Array.Resize(ref buffer, messageLen + 4);
+                            if (readBuffer.Length != buffer.Length)
+                            {
+                                var newBuffer = new byte[buffer.Length];
+                                readBuffer.CopyTo(newBuffer);
+                                buffer = newBuffer;
+                            }
+
+                            if (buffer.Length < messageLen + 4)
+                            {
+                                Array.Resize(ref buffer, messageLen + 4);
+                            }
                         }
                         var remain = messageLen - (readLen - 4);
-                        await ReadFullyAsync(buffer, pipeStream, readLen, remain, token).ConfigureAwait(false);
+                        await ReadFullyAsync(buffer, client, readLen, remain, token).ConfigureAwait(false);
                         value = buffer.AsMemory(4, messageLen);
+                        readBuffer = Array.Empty<byte>();
+                        goto PARSE_MESSAGE;
                     }
-                }
-                catch (IOException)
-                {
-                    return; // connection closed.
                 }
                 catch (Exception ex)
                 {
@@ -230,7 +245,7 @@ namespace MessagePipe.Interprocess.Workers
                     options.UnhandledErrorHandler("network error, receive loop will terminate." + Environment.NewLine, ex);
                     return;
                 }
-
+            PARSE_MESSAGE:
                 try
                 {
                     var message = MessageBuilder.ReadPubSubMessage(value.ToArray()); // can avoid copy?
@@ -254,12 +269,19 @@ namespace MessagePipe.Interprocess.Workers
                                         .First(x => x.GetGenericArguments().Any(y => y.FullName == header.RequestType));
                                     var service = provider.GetRequiredService(interfaceType); // IAsyncRequestHandler<TRequest,TResponse>
                                     var genericArgs = interfaceType.GetGenericArguments(); // [TRequest, TResponse]
+                                    // Unity IL2CPP does not work(can not invoke nongenerics MessagePackSerializer)
                                     var request = MessagePackSerializer.Deserialize(genericArgs[0], message.ValueMemory, options.MessagePackSerializerOptions);
-                                    var responseTask = coreInterfaceType.GetMethod("InvokeAsync").Invoke(service, new[] { request, CancellationToken.None });
-                                    var task = typeof(UniTask<>).MakeGenericType(genericArgs[1]).GetMethod("AsTask").Invoke(responseTask, null);
-                                    await ((System.Threading.Tasks.Task)task); // Task<T> -> Task
-                                    var result = task.GetType().GetProperty("Result").GetValue(task);
-                                    resultBytes = MessageBuilder.BuildRemoteResponseMessage(mid, genericArgs[1], result, options.MessagePackSerializerOptions);
+                                    var responseTask = coreInterfaceType.GetMethod("InvokeAsync")!.Invoke(service, new[] { request, CancellationToken.None });
+#if !UNITY_2018_3_OR_NEWER
+                                    var task = typeof(ValueTask<>).MakeGenericType(genericArgs[1]).GetMethod("AsTask")!.Invoke(responseTask, null);
+#else
+                                    var asTask = typeof(UniTaskExtensions).GetMethods().First(x => x.IsGenericMethod && x.Name == "AsTask")
+                                        .MakeGenericMethod(genericArgs[1]);
+                                    var task = asTask.Invoke(null, new[] { responseTask });
+#endif
+                                    await ((System.Threading.Tasks.Task)task!); // Task<T> -> Task
+                                    var result = task.GetType().GetProperty("Result")!.GetValue(task);
+                                    resultBytes = MessageBuilder.BuildRemoteResponseMessage(mid, genericArgs[1], result!, options.MessagePackSerializerOptions);
                                 }
                                 catch (Exception ex)
                                 {
@@ -267,7 +289,7 @@ namespace MessagePipe.Interprocess.Workers
                                     resultBytes = MessageBuilder.BuildRemoteResponseError(mid, ex.ToString(), options.MessagePackSerializerOptions);
                                 }
 
-                                await pipeStream.WriteAsync(resultBytes, 0, resultBytes.Length).ConfigureAwait(false);
+                                await client.SendAsync(resultBytes).ConfigureAwait(false);
                             }
                             break;
                         case MessageType.RemoteResponse:
@@ -292,10 +314,6 @@ namespace MessagePipe.Interprocess.Workers
                             break;
                     }
                 }
-                catch (IOException)
-                {
-                    return; // connection closed.
-                }
                 catch (Exception ex)
                 {
                     if (ex is OperationCanceledException) continue;
@@ -315,11 +333,11 @@ namespace MessagePipe.Interprocess.Workers
             return MessagePackSerializer.Deserialize<T>(buffer, options);
         }
 
-        static async UniTask ReadFullyAsync(byte[] buffer, Stream stream, int index, int remain, CancellationToken token)
+        static async ValueTask ReadFullyAsync(byte[] buffer, SocketTcpClient client, int index, int remain, CancellationToken token)
         {
             while (remain > 0)
             {
-                var len = await stream.ReadAsync(buffer, index, remain, token).ConfigureAwait(false);
+                var len = await client.ReceiveAsync(buffer, index, remain, token).ConfigureAwait(false);
                 index += len;
                 remain -= len;
             }
@@ -340,15 +358,6 @@ namespace MessagePipe.Interprocess.Workers
             if (client.IsValueCreated)
             {
                 client.Value.Dispose();
-            }
-
-            foreach (var item in responseCompletions)
-            {
-                try
-                {
-                    item.Value.TrySetCanceled();
-                }
-                catch { }
             }
         }
     }
