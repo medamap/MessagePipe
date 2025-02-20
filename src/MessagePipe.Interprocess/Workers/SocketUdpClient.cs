@@ -6,14 +6,74 @@ using Cysharp.Threading.Tasks;
 
 namespace MessagePipe.Interprocess.Workers
 {
+    /// <summary>
+    /// UDP サーバークラス（受信用）
+    /// </summary>
+    internal sealed class SocketUdpServer : IDisposable
+    {
+        const int MinBuffer = 4096;
+        readonly Socket socket;
+        readonly byte[] buffer;
+
+        SocketUdpServer(int bufferSize, AddressFamily addressFamily, ProtocolType protocolType)
+        {
+            socket = new Socket(addressFamily, SocketType.Dgram, protocolType);
+            socket.ReceiveBufferSize = bufferSize;
+            buffer = new byte[Math.Max(bufferSize, MinBuffer)];
+        }
+
+        public static SocketUdpServer Bind(int port, int bufferSize)
+        {
+            var server = new SocketUdpServer(bufferSize, AddressFamily.InterNetwork, ProtocolType.Udp);
+            // すべてのインターフェースから受信
+            server.socket.Bind(new IPEndPoint(IPAddress.Any, port));
+            return server;
+        }
+
+#if NET5_0_OR_GREATER
+        public static SocketUdpServer BindUds(string domainSocketPath, int bufferSize)
+        {
+            var server = new SocketUdpServer(bufferSize, AddressFamily.Unix, ProtocolType.IP);
+            server.socket.Bind(new UnixDomainSocketEndPoint(domainSocketPath));
+            return server;
+        }
+#endif
+
+        public async UniTask<ReadOnlyMemory<byte>> ReceiveAsync(CancellationToken cancellationToken)
+        {
+#if NET5_0_OR_GREATER
+            int i = await socket.ReceiveAsync(buffer, SocketFlags.None, cancellationToken).ConfigureAwait(false);
+            return buffer.AsMemory(0, i);
+#else
+            var tcs = new UniTaskCompletionSource<ReadOnlyMemory<byte>>();
+            socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ar =>
+            {
+                int i;
+                try { i = socket.EndReceive(ar); }
+                catch (Exception ex) { tcs.TrySetException(ex); return; }
+                tcs.TrySetResult(buffer.AsMemory(0, i));
+            }, null);
+            return await tcs.Task;
+#endif
+        }
+
+        public void Dispose()
+        {
+            socket.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// UDP クライアントクラス（送信用、ブロードキャスト専用）
+    /// </summary>
     internal sealed class SocketUdpClient : IDisposable
     {
         const int MinBuffer = 4096;
         readonly Socket socket;
         readonly byte[] buffer;
-        // 送信先エンドポイント。ブロードキャストの場合は常にこのエンドポイントを使用
+        // 送信先エンドポイント（常にブロードキャストアドレス）
         readonly EndPoint remoteEndPoint;
-        // ブロードキャスト送信の場合は true を設定
+        // ブロードキャストモードなら true
         readonly bool useSendTo;
 
         SocketUdpClient(int bufferSize, AddressFamily addressFamily, ProtocolType protocolType, EndPoint remoteEndPoint, bool useSendTo)
@@ -25,14 +85,15 @@ namespace MessagePipe.Interprocess.Workers
             this.useSendTo = useSendTo;
         }
 
-        // 強制的にブロードキャストモードを使う実装
+        /// <summary>
+        /// ブロードキャスト専用の接続。入力のホストは無視して常に 255.255.255.255 を使用する。
+        /// </summary>
         public static SocketUdpClient Connect(string host, int port, int bufferSize)
         {
-            // ブロードキャスト用に常に IPAddress.Broadcast を使用
-            var broadcastIP = IPAddress.Broadcast; // 255.255.255.255
+            var broadcastIP = IPAddress.Broadcast; // "255.255.255.255"
             var endpoint = new IPEndPoint(broadcastIP, port);
             var client = new SocketUdpClient(bufferSize, broadcastIP.AddressFamily, ProtocolType.Udp, endpoint, true);
-            // ブロードキャスト送信を許可する
+            // ブロードキャストを有効にする
             client.socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
             return client;
         }
@@ -52,6 +113,7 @@ namespace MessagePipe.Interprocess.Workers
 #if NET5_0_OR_GREATER
             if (useSendTo)
             {
+                // ブロードキャスト送信の場合は SendToAsync を使用
                 return socket.SendToAsync(data, SocketFlags.None, remoteEndPoint, cancellationToken);
             }
             else
