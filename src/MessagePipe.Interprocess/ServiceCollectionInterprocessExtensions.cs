@@ -16,6 +16,29 @@ namespace MessagePipe
 {
     public static class ServiceCollectionInterprocessExtensions
     {
+        public static ReturnType AddUdpInterprocessWithSubnet(this IMessagePipeBuilder builder, string host, int port, string subnetMask, string networkAddress)
+        {
+            return AddUdpInterprocessWithSubnet(builder, host, port, subnetMask, networkAddress, _ => { });
+        }
+
+        public static ReturnType AddUdpInterprocessWithSubnet(this IMessagePipeBuilder builder, string host, int port, string subnetMask, string networkAddress, Action<MessagePipeInterprocessUdpOptions> configure)
+        {
+            var options = new MessagePipeInterprocessUdpOptions(host, port, subnetMask, networkAddress);
+            configure(options);
+
+            builder.Services.AddSingleton(options);
+            builder.Services.Add(typeof(UdpWorker), options.InstanceLifetime);
+
+#if !UNITY_2018_3_OR_NEWER
+            builder.Services.Add(typeof(IDistributedPublisher<,>), typeof(UdpDistributedPublisher<,>), options.InstanceLifetime);
+            builder.Services.Add(typeof(IDistributedSubscriber<,>), typeof(UdpDistributedSubscriber<,>), options.InstanceLifetime);
+            return builder;
+#else
+        AddAsyncMessageBroker<IInterprocessKey, IInterprocessValue>(builder, options);
+        return options;
+#endif
+        }
+
         public static ReturnType AddUdpInterprocess(this IMessagePipeBuilder builder, string host, int port)
         {
             return AddUdpInterprocess(builder, host, port, _ => { });
