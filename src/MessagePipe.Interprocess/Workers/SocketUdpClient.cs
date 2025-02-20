@@ -6,9 +6,6 @@ using Cysharp.Threading.Tasks;
 
 namespace MessagePipe.Interprocess.Workers
 {
-    /// <summary>
-    /// UDP サーバークラス（受信用）
-    /// </summary>
     internal sealed class SocketUdpServer : IDisposable
     {
         const int MinBuffer = 4096;
@@ -21,15 +18,12 @@ namespace MessagePipe.Interprocess.Workers
             socket.ReceiveBufferSize = bufferSize;
             buffer = new byte[Math.Max(bufferSize, MinBuffer)];
         }
-
         public static SocketUdpServer Bind(int port, int bufferSize)
         {
             var server = new SocketUdpServer(bufferSize, AddressFamily.InterNetwork, ProtocolType.Udp);
-            // すべてのインターフェースから受信
             server.socket.Bind(new IPEndPoint(IPAddress.Any, port));
             return server;
         }
-
 #if NET5_0_OR_GREATER
         public static SocketUdpServer BindUds(string domainSocketPath, int bufferSize)
         {
@@ -38,7 +32,6 @@ namespace MessagePipe.Interprocess.Workers
             return server;
         }
 #endif
-
         public async UniTask<ReadOnlyMemory<byte>> ReceiveAsync(CancellationToken cancellationToken)
         {
 #if NET5_0_OR_GREATER
@@ -56,24 +49,19 @@ namespace MessagePipe.Interprocess.Workers
             return await tcs.Task;
 #endif
         }
-
         public void Dispose()
         {
             socket.Dispose();
         }
     }
 
-    /// <summary>
-    /// UDP クライアントクラス（送信用、ブロードキャスト専用）
-    /// </summary>
     internal sealed class SocketUdpClient : IDisposable
     {
         const int MinBuffer = 4096;
         readonly Socket socket;
         readonly byte[] buffer;
-        // 送信先エンドポイント（常にブロードキャストアドレス）
+        // remoteEndPoint を保持して、ブロードキャスト送信時に SendTo() を利用する
         readonly EndPoint remoteEndPoint;
-        // ブロードキャストモードなら true
         readonly bool useSendTo;
 
         SocketUdpClient(int bufferSize, AddressFamily addressFamily, ProtocolType protocolType, EndPoint remoteEndPoint, bool useSendTo)
@@ -86,16 +74,71 @@ namespace MessagePipe.Interprocess.Workers
         }
 
         /// <summary>
-        /// ブロードキャスト専用の接続。入力のホストは無視して常に 255.255.255.255 を使用する。
+        /// UDP クライアントの接続を行います。
+        /// オプションとして subnetMask と networkAddress を指定でき、
+        /// これらが設定されている場合は、ブロードキャストアドレスを計算して判定します。
         /// </summary>
-        public static SocketUdpClient Connect(string host, int port, int bufferSize)
+        /// <param name="host">送信先ホスト（通常はIP文字列）</param>
+        /// <param name="port">送信先ポート</param>
+        /// <param name="bufferSize">バッファサイズ</param>
+        /// <param name="subnetMask">サブネットマスク（例:"255.255.255.0"） ※任意</param>
+        /// <param name="networkAddress">ネットワークアドレス（例:"192.168.1.0"） ※任意</param>
+        /// <returns></returns>
+        public static SocketUdpClient Connect(string host, int port, int bufferSize, string subnetMask = null, string networkAddress = null)
         {
-            var broadcastIP = IPAddress.Broadcast; // "255.255.255.255"
-            var endpoint = new IPEndPoint(broadcastIP, port);
-            var client = new SocketUdpClient(bufferSize, broadcastIP.AddressFamily, ProtocolType.Udp, endpoint, true);
-            // ブロードキャストを有効にする
-            client.socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
-            return client;
+            bool isBroadcast = false;
+            IPAddress hostIP = IPAddress.Parse(host);
+            // まず、ホストが "255.255.255.255" であればブロードキャスト
+            if (hostIP.Equals(IPAddress.Broadcast) || host == "255.255.255.255")
+            {
+                isBroadcast = true;
+            }
+            // もしサブネット情報が与えられていれば、計算して判定
+            else if (!string.IsNullOrEmpty(subnetMask) && !string.IsNullOrEmpty(networkAddress))
+            {
+                try
+                {
+                    var maskBytes = IPAddress.Parse(subnetMask).GetAddressBytes();
+                    var networkBytes = IPAddress.Parse(networkAddress).GetAddressBytes();
+                    if (maskBytes.Length == networkBytes.Length)
+                    {
+                        byte[] broadcastBytes = new byte[maskBytes.Length];
+                        for (int i = 0; i < maskBytes.Length; i++)
+                        {
+                            // ブロードキャストアドレス = ネットワークアドレス OR (NOT サブネットマスク)
+                            broadcastBytes[i] = (byte)(networkBytes[i] | (~maskBytes[i]));
+                        }
+                        var computedBroadcast = new IPAddress(broadcastBytes);
+                        if (hostIP.Equals(computedBroadcast))
+                        {
+                            isBroadcast = true;
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    // サブネット情報の解析に失敗した場合は、通常の接続とする
+                    isBroadcast = false;
+                }
+            }
+
+            if (isBroadcast)
+            {
+                // ブロードキャストの場合、Connect() を呼ばずに remoteEndPoint を保持する
+                var broadcastIP = IPAddress.Broadcast; // 255.255.255.255
+                var endpoint = new IPEndPoint(broadcastIP, port);
+                var client = new SocketUdpClient(bufferSize, broadcastIP.AddressFamily, ProtocolType.Udp, endpoint, true);
+                client.socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
+                return client;
+            }
+            else
+            {
+                // 通常接続の場合
+                var endpoint = new IPEndPoint(hostIP, port);
+                var client = new SocketUdpClient(bufferSize, hostIP.AddressFamily, ProtocolType.Udp, endpoint, false);
+                client.socket.Connect(endpoint);
+                return client;
+            }
         }
 
 #if NET5_0_OR_GREATER
@@ -113,7 +156,6 @@ namespace MessagePipe.Interprocess.Workers
 #if NET5_0_OR_GREATER
             if (useSendTo)
             {
-                // ブロードキャスト送信の場合は SendToAsync を使用
                 return socket.SendToAsync(data, SocketFlags.None, remoteEndPoint, cancellationToken);
             }
             else

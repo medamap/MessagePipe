@@ -26,12 +26,16 @@ namespace MessagePipe.Interprocess
     {
         public string Host { get; }
         public int Port { get; }
+        public string SubnetMask { get; }
+        public string NetworkAddress { get; }
 
-        public MessagePipeInterprocessUdpOptions(string host, int port)
+        public MessagePipeInterprocessUdpOptions(string host, int port, string? subnetMask = null, string? networkAddress = null)
             : base()
         {
             this.Host = host;
             this.Port = port;
+            this.SubnetMask = subnetMask ?? string.Empty;
+            this.NetworkAddress = networkAddress ?? string.Empty;
         }
     }
 
