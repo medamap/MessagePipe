@@ -1,0 +1,19 @@
+{
+  "name": "MessagePipe.Interprocess",
+  "rootNamespace": "MessagePipe",
+  "references": [
+    "MessagePipe",
+    "MessagePack",
+    "MessagePack.Annotations",
+    "UniTask"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

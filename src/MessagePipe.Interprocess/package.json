@@ -1,0 +1,15 @@
+{
+  "name": "jp.megamin.messagepipe.interprocess",
+  "displayName": "MessagePipe.Interprocess",
+  "version": "1.8.1",
+  "unity": "2018.4",
+  "description": "MessagePipe Interprocess Extension.",
+  "keywords": [
+    "pubsub",
+    "event",
+    "Scripting",
+    "DI"
+  ],
+  "license": "MIT",
+  "category": "Scripting"
+}
