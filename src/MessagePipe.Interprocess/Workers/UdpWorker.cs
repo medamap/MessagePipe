@@ -16,7 +16,7 @@ namespace MessagePipe.Interprocess.Workers
         readonly IAsyncPublisher<IInterprocessKey, IInterprocessValue> publisher;
         readonly MessagePipeInterprocessOptions options;
 
-        // Channel is used from publisher for thread safety of write packet
+        // チャネルは送信パケットのスレッドセーフなキュー用
         int initializedServer = 0;
         Lazy<SocketUdpServer> server;
         Channel<byte[]> channel;
@@ -24,7 +24,7 @@ namespace MessagePipe.Interprocess.Workers
         int initializedClient = 0;
         Lazy<SocketUdpClient> client;
 
-        // create from DI
+        // DI で作成
         [Preserve]
         public UdpWorker(MessagePipeInterprocessUdpOptions options, IAsyncPublisher<IInterprocessKey, IInterprocessValue> publisher)
         {
@@ -83,11 +83,12 @@ namespace MessagePipe.Interprocess.Workers
 #endif
         }
 #endif
+
         public void Publish<TKey, TMessage>(TKey key, TMessage message)
         {
-            if (Interlocked.Increment(ref initializedClient) == 1) // first incr, channel not yet started
+            if (Interlocked.Increment(ref initializedClient) == 1) // 最初の送信なら初期化＆ループ開始
             {
-                _ = client.Value; // init
+                _ = client.Value; // 初期化
                 RunPublishLoop();
             }
 
@@ -95,7 +96,7 @@ namespace MessagePipe.Interprocess.Workers
             channel.Writer.TryWrite(buffer);
         }
 
-        // Send packet to udp socket from publisher
+        // 送信ループ
         async void RunPublishLoop()
         {
             var reader = channel.Reader;
@@ -111,12 +112,13 @@ namespace MessagePipe.Interprocess.Workers
                     }
                     catch (Exception ex)
                     {
-                        if (ex is OperationCanceledException) return;
-                        if (token.IsCancellationRequested) return;
-
-                        // network error, terminate.
-                        options.UnhandledErrorHandler("network error, publish loop will terminate." + Environment.NewLine, ex);
-                        return;
+                        if (ex is OperationCanceledException || token.IsCancellationRequested)
+                            return;
+                        // ログ出力し、短い待機後にループを継続（再試行）
+                        options.UnhandledErrorHandler("Publish loop encountered network error; retrying after delay." + Environment.NewLine, ex);
+                        await UniTask.Delay(TimeSpan.FromSeconds(1), cancellationToken: token);
+                        // ※必要に応じて、クライアントの再初期化処理も検討する
+                        continue;
                     }
                 }
             }
@@ -124,14 +126,14 @@ namespace MessagePipe.Interprocess.Workers
 
         public void StartReceiver()
         {
-            if (Interlocked.Increment(ref initializedServer) == 1) // first incr, channel not yet started
+            if (Interlocked.Increment(ref initializedServer) == 1) // 初回なら初期化＆受信ループ開始
             {
-                _ = server.Value; // init
+                _ = server.Value; // 初期化
                 RunReceiveLoop();
             }
         }
 
-        // Receive from udp socket and push value to subscribers.
+        // 受信ループ
         async void RunReceiveLoop()
         {
             var token = cancellationTokenSource.Token;
@@ -142,22 +144,26 @@ namespace MessagePipe.Interprocess.Workers
                 try
                 {
                     value = await udpServer.ReceiveAsync(token).ConfigureAwait(false);
-                    if (value.Length == 0) return; // invalid data?
+                    if (value.Length == 0)
+                    {
+                        // ゼロ長パケットの場合は、ループを継続
+                        continue;
+                    }
                     var len = MessageBuilder.FetchMessageLength(value.Span);
                     if (len != value.Length - 4)
                     {
-                        throw new InvalidOperationException("Receive invalid message size.");
+                        throw new InvalidOperationException("Received invalid message size.");
                     }
                     value = value.Slice(4);
                 }
                 catch (Exception ex)
                 {
-                    if (ex is OperationCanceledException) return;
-                    if (token.IsCancellationRequested) return;
-
-                    // network error, terminate.
-                    options.UnhandledErrorHandler("network error, receive loop will terminate." + Environment.NewLine, ex);
-                    return;
+                    if (ex is OperationCanceledException || token.IsCancellationRequested)
+                        break;
+                    // ログ出力し、短い待機後に受信ループを再試行
+                    options.UnhandledErrorHandler("Receive loop encountered network error; retrying after delay." + Environment.NewLine, ex);
+                    await UniTask.Delay(TimeSpan.FromSeconds(1), cancellationToken: token);
+                    continue;
                 }
 
                 try
@@ -167,9 +173,9 @@ namespace MessagePipe.Interprocess.Workers
                 }
                 catch (Exception ex)
                 {
-                    if (ex is OperationCanceledException) return;
-                    if (token.IsCancellationRequested) return;
-                    options.UnhandledErrorHandler("", ex);
+                    if (ex is OperationCanceledException || token.IsCancellationRequested)
+                        break;
+                    options.UnhandledErrorHandler("Error processing received message." + Environment.NewLine, ex);
                 }
             }
         }
