@@ -9,6 +9,13 @@ using Cysharp.Threading.Tasks;
 
 namespace MessagePipe.Interprocess.Workers
 {
+    // メッセージキューに入れるためのコンテナクラス
+    internal class UdpMessageContainer
+    {
+        public byte[] Data { get; set; }
+        public string ToAddress { get; set; }
+    }
+
     [Preserve]
     public sealed class UdpWorker : IDisposable
     {
@@ -19,7 +26,7 @@ namespace MessagePipe.Interprocess.Workers
         // Channel is used from publisher for thread safety of write packet
         int initializedServer = 0;
         Lazy<SocketUdpServer> server;
-        Channel<byte[]> channel;
+        Channel<UdpMessageContainer> channel;
 
         int initializedClient = 0;
         Lazy<SocketUdpClient> client;
@@ -47,14 +54,14 @@ namespace MessagePipe.Interprocess.Workers
             });
 
 #if !UNITY_2018_3_OR_NEWER
-            this.channel = Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions()
+            this.channel = Channel.CreateUnbounded<UdpMessageContainer>(new UnboundedChannelOptions()
             {
                 SingleReader = true,
                 SingleWriter = false,
                 AllowSynchronousContinuations = true
             });
 #else
-            this.channel = Channel.CreateSingleConsumerUnbounded<byte[]>();
+            this.channel = Channel.CreateSingleConsumerUnbounded<UdpMessageContainer>();
 #endif
         }
 
@@ -77,19 +84,31 @@ namespace MessagePipe.Interprocess.Workers
             });
 
 #if !UNITY_2018_3_OR_NEWER
-            this.channel = Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions()
+            this.channel = Channel.CreateUnbounded<UdpMessageContainer>(new UnboundedChannelOptions()
             {
                 SingleReader = true,
                 SingleWriter = false,
                 AllowSynchronousContinuations = true
             });
 #else
-            this.channel = Channel.CreateSingleConsumerUnbounded<byte[]>();
+            this.channel = Channel.CreateSingleConsumerUnbounded<UdpMessageContainer>();
 #endif
         }
 #endif
 
+        /// <summary>
+        /// デフォルトの送信先アドレスを使用してメッセージを発行します
+        /// </summary>
         public void Publish<TKey, TMessage>(TKey key, TMessage message)
+        {
+            Publish(key, message, null);
+        }
+
+        /// <summary>
+        /// 指定された送信先アドレスを使用してメッセージを発行します
+        /// null の場合はデフォルトの送信先が使用されます
+        /// </summary>
+        public void Publish<TKey, TMessage>(TKey key, TMessage message, string toAddress)
         {
             if (Interlocked.Increment(ref initializedClient) == 1) // first incr, channel not yet started
             {
@@ -98,7 +117,7 @@ namespace MessagePipe.Interprocess.Workers
             }
 
             var buffer = MessageBuilder.BuildPubSubMessage(key, message, options.MessagePackSerializerOptions);
-            channel.Writer.TryWrite(buffer);
+            channel.Writer.TryWrite(new UdpMessageContainer { Data = buffer, ToAddress = toAddress });
         }
 
         // Send packet to udp socket from publisher
@@ -113,7 +132,15 @@ namespace MessagePipe.Interprocess.Workers
                 {
                     try
                     {
-                        await udpClient.SendAsync(item, token).ConfigureAwait(false);
+                        // 送信先アドレスが指定されている場合は特定のアドレスに送信、そうでなければデフォルト送信先を使用
+                        if (!string.IsNullOrEmpty(item.ToAddress))
+                        {
+                            await udpClient.SendToAsync(item.Data, item.ToAddress, token).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            await udpClient.SendAsync(item.Data, token).ConfigureAwait(false);
+                        }
                     }
                     catch (Exception ex)
                     {

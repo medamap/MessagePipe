@@ -19,7 +19,14 @@ namespace MessagePipe.Interprocess
 
         public UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = default)
         {
-            worker.Publish(key, message);
+            worker.Publish(key, message, null); // Use default address
+            return default;
+        }
+
+        // オーバーロードメソッドの追加: 送信先アドレスを動的に指定できるようにする
+        public UniTask PublishAsync(TKey key, TMessage message, string toAddress, CancellationToken cancellationToken = default)
+        {
+            worker.Publish(key, message, toAddress); // Use specified address
             return default;
         }
     }

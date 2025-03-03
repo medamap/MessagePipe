@@ -63,14 +63,18 @@ namespace MessagePipe.Interprocess.Workers
         // remoteEndPoint を保持して、ブロードキャスト送信時に SendTo() を利用する
         readonly EndPoint remoteEndPoint;
         readonly bool useSendTo;
+        readonly AddressFamily addressFamily;
+        readonly int port;
 
-        SocketUdpClient(int bufferSize, AddressFamily addressFamily, ProtocolType protocolType, EndPoint remoteEndPoint, bool useSendTo)
+        SocketUdpClient(int bufferSize, AddressFamily addressFamily, ProtocolType protocolType, EndPoint remoteEndPoint, bool useSendTo, int port = 0)
         {
             socket = new Socket(addressFamily, SocketType.Dgram, protocolType);
             socket.SendBufferSize = bufferSize;
             buffer = new byte[Math.Max(bufferSize, MinBuffer)];
             this.remoteEndPoint = remoteEndPoint;
             this.useSendTo = useSendTo;
+            this.addressFamily = addressFamily;
+            this.port = port;
         }
 
         /// <summary>
@@ -127,7 +131,7 @@ namespace MessagePipe.Interprocess.Workers
                 // ブロードキャストの場合、Connect() を呼ばずに remoteEndPoint を保持する
                 var broadcastIP = IPAddress.Broadcast; // 255.255.255.255
                 var endpoint = new IPEndPoint(broadcastIP, port);
-                var client = new SocketUdpClient(bufferSize, broadcastIP.AddressFamily, ProtocolType.Udp, endpoint, true);
+                var client = new SocketUdpClient(bufferSize, broadcastIP.AddressFamily, ProtocolType.Udp, endpoint, true, port);
                 client.socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
                 return client;
             }
@@ -135,7 +139,7 @@ namespace MessagePipe.Interprocess.Workers
             {
                 // 通常接続の場合
                 var endpoint = new IPEndPoint(hostIP, port);
-                var client = new SocketUdpClient(bufferSize, hostIP.AddressFamily, ProtocolType.Udp, endpoint, false);
+                var client = new SocketUdpClient(bufferSize, hostIP.AddressFamily, ProtocolType.Udp, endpoint, false, port);
                 client.socket.Connect(endpoint);
                 return client;
             }
@@ -151,35 +155,59 @@ namespace MessagePipe.Interprocess.Workers
         }
 #endif
 
+        /// <summary>
+        /// デフォルトのエンドポイントにデータを送信します
+        /// </summary>
         public UniTask<int> SendAsync(byte[] data, CancellationToken cancellationToken = default)
         {
+            return SendToEndpointAsync(data, remoteEndPoint, cancellationToken);
+        }
+
+        /// <summary>
+        /// 指定されたアドレスにデータを送信します
+        /// </summary>
+        public UniTask<int> SendToAsync(byte[] data, string toAddress, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(toAddress))
+            {
+                return SendAsync(data, cancellationToken);
+            }
+
+            try
+            {
+                IPAddress targetIP = IPAddress.Parse(toAddress);
+                bool isBroadcast = targetIP.Equals(IPAddress.Broadcast) || toAddress == "255.255.255.255";
+                
+                // ブロードキャストの場合はソケットオプションを設定
+                if (isBroadcast)
+                {
+                    socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
+                }
+                
+                var endpoint = new IPEndPoint(targetIP, port);
+                return SendToEndpointAsync(data, endpoint, cancellationToken);
+            }
+            catch (Exception)
+            {
+                // アドレス解析に失敗した場合はデフォルトエンドポイントを使用
+                return SendAsync(data, cancellationToken);
+            }
+        }
+
+        /// <summary>
+        /// 指定されたエンドポイントにデータを送信します
+        /// </summary>
+        private UniTask<int> SendToEndpointAsync(byte[] data, EndPoint endpoint, CancellationToken cancellationToken = default)
+        {
 #if NET5_0_OR_GREATER
-            if (useSendTo)
-            {
-                return socket.SendToAsync(data, SocketFlags.None, remoteEndPoint, cancellationToken);
-            }
-            else
-            {
-                return socket.SendAsync(data, SocketFlags.None, cancellationToken);
-            }
+            return socket.SendToAsync(data, SocketFlags.None, endpoint, cancellationToken);
 #else
             var tcs = new UniTaskCompletionSource<int>();
-            if (useSendTo)
+            socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, endpoint, ar =>
             {
-                socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, remoteEndPoint, ar =>
-                {
-                    try { tcs.TrySetResult(socket.EndSend(ar)); }
-                    catch (Exception ex) { tcs.TrySetException(ex); }
-                }, null);
-            }
-            else
-            {
-                socket.BeginSend(data, 0, data.Length, SocketFlags.None, ar =>
-                {
-                    try { tcs.TrySetResult(socket.EndSend(ar)); }
-                    catch (Exception ex) { tcs.TrySetException(ex); }
-                }, null);
-            }
+                try { tcs.TrySetResult(socket.EndSendTo(ar)); }
+                catch (Exception ex) { tcs.TrySetException(ex); }
+            }, null);
 #if !UNITY_2018_3_OR_NEWER
             return new UniTask<int>(tcs.Task);
 #else
