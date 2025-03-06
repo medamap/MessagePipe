@@ -16,9 +16,9 @@ namespace MessagePipe
 {
     public static class ServiceCollectionInterprocessExtensions
     {
-        public static ReturnType AddUdpInterprocessWithSubnet(this IMessagePipeBuilder builder, string host, int port, string subnetMask, string networkAddress)
+        public static ReturnType AddUdpInterprocessWithSubnet(this IMessagePipeBuilder builder, string host, int port, string subnetMask, string networkAddress, bool ignoreBindErrors = false, bool ignoreSendErrors = false)
         {
-            return AddUdpInterprocessWithSubnet(builder, host, port, subnetMask, networkAddress, _ => { });
+            return AddUdpInterprocessWithSubnet(builder, host, port, subnetMask, networkAddress, ignoreBindErrors, ignoreSendErrors, _ => { });
         }
 
         public static ReturnType AddUdpInterprocessWithSubnet(this IMessagePipeBuilder builder, string host, int port, string subnetMask, string networkAddress, bool ignoreBindErrors, bool ignoreSendErrors, Action<MessagePipeInterprocessUdpOptions> configure)
