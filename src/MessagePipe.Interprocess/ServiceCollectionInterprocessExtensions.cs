@@ -21,9 +21,9 @@ namespace MessagePipe
             return AddUdpInterprocessWithSubnet(builder, host, port, subnetMask, networkAddress, _ => { });
         }
 
-        public static ReturnType AddUdpInterprocessWithSubnet(this IMessagePipeBuilder builder, string host, int port, string subnetMask, string networkAddress, Action<MessagePipeInterprocessUdpOptions> configure)
+        public static ReturnType AddUdpInterprocessWithSubnet(this IMessagePipeBuilder builder, string host, int port, string subnetMask, string networkAddress, bool ignoreBindErrors, bool ignoreSendErrors, Action<MessagePipeInterprocessUdpOptions> configure)
         {
-            var options = new MessagePipeInterprocessUdpOptions(host, port, subnetMask, networkAddress);
+            var options = new MessagePipeInterprocessUdpOptions(host, port, subnetMask, networkAddress, ignoreBindErrors, ignoreSendErrors);
             configure(options);
 
             builder.Services.AddSingleton(options);
