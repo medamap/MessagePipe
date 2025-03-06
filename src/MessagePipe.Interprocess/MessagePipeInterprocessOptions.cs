@@ -28,6 +28,20 @@ namespace MessagePipe.Interprocess
         public int Port { get; }
         public string SubnetMask { get; }
         public string NetworkAddress { get; }
+        
+        /// <summary>
+        /// UDPソケットのバインドエラーを無視するかどうか
+        /// true の場合、バインドに失敗しても例外をスローせず、静かに失敗します
+        /// false の場合、バインドに失敗すると例外がスローされます（デフォルト）
+        /// </summary>
+        public bool IgnoreBindErrors { get; set; } = false;
+        
+        /// <summary>
+        /// ネットワーク送信エラーを無視するかどうか
+        /// true の場合、送信エラーが発生しても処理を継続します
+        /// false の場合、送信エラーが発生するとパブリッシュループが終了します（デフォルト）
+        /// </summary>
+        public bool IgnoreSendErrors { get; set; } = false;
 
         public MessagePipeInterprocessUdpOptions(string host, int port, string? subnetMask = null, string? networkAddress = null)
             : base()
@@ -72,14 +86,28 @@ namespace MessagePipe.Interprocess
     public sealed class MessagePipeInterprocessUdpUdsOptions : MessagePipeInterprocessOptions
     {
         public string SocketPath { get; set; }
+        
+        /// <summary>
+        /// UDPソケットのバインドエラーを無視するかどうか
+        /// true の場合、バインドに失敗しても例外をスローせず、静かに失敗します
+        /// false の場合、バインドに失敗すると例外がスローされます（デフォルト）
+        /// </summary>
+        public bool IgnoreBindErrors { get; set; } = false;
+        
+        /// <summary>
+        /// ネットワーク送信エラーを無視するかどうか
+        /// true の場合、送信エラーが発生しても処理を継続します
+        /// false の場合、送信エラーが発生するとパブリッシュループが終了します（デフォルト）
+        /// </summary>
+        public bool IgnoreSendErrors { get; set; } = false;
 
         public MessagePipeInterprocessUdpUdsOptions(string socketPath)
             : base()
         {
             this.SocketPath = socketPath;
         }
-
     }
+    
     public sealed class MessagePipeInterprocessTcpUdsOptions : MessagePipeInterprocessOptions
     {
         public string SocketPath { get; set; }

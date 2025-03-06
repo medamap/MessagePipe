@@ -11,6 +11,12 @@ namespace MessagePipe.Interprocess.Workers
         const int MinBuffer = 4096;
         readonly Socket socket;
         readonly byte[] buffer;
+        
+        /// <summary>
+        /// サーバーが有効な状態かどうかを示すフラグ
+        /// バインドに失敗した場合はfalseになります
+        /// </summary>
+        public bool IsValid { get; private set; } = true;
 
         SocketUdpServer(int bufferSize, AddressFamily addressFamily, ProtocolType protocolType)
         {
@@ -18,28 +24,81 @@ namespace MessagePipe.Interprocess.Workers
             socket.ReceiveBufferSize = bufferSize;
             buffer = new byte[Math.Max(bufferSize, MinBuffer)];
         }
-        public static SocketUdpServer Bind(int port, int bufferSize)
+        
+        /// <summary>
+        /// UDPサーバーをバインドします
+        /// </summary>
+        /// <param name="port">バインドするポート番号</param>
+        /// <param name="bufferSize">バッファサイズ</param>
+        /// <param name="ignoreBindErrors">バインドエラーを無視するかどうか</param>
+        /// <returns>バインドされたUDPサーバー</returns>
+        public static SocketUdpServer Bind(int port, int bufferSize, bool ignoreBindErrors = false)
         {
             var server = new SocketUdpServer(bufferSize, AddressFamily.InterNetwork, ProtocolType.Udp);
-            server.socket.Bind(new IPEndPoint(IPAddress.Any, port));
+            try
+            {
+                server.socket.Bind(new IPEndPoint(IPAddress.Any, port));
+            }
+            catch (SocketException ex)
+            {
+                // バインドに失敗した場合
+                server.IsValid = false;
+                
+                // ignoreBindErrors が false の場合は例外を再スロー
+                if (!ignoreBindErrors)
+                {
+                    throw new InvalidOperationException($"Failed to bind UDP socket to port {port}. This may be due to network restrictions or configuration.", ex);
+                }
+                // ignoreBindErrors が true の場合は例外を無視
+            }
             return server;
         }
+        
 #if NET5_0_OR_GREATER
-        public static SocketUdpServer BindUds(string domainSocketPath, int bufferSize)
+        /// <summary>
+        /// UNIXドメインソケットサーバーをバインドします
+        /// </summary>
+        /// <param name="domainSocketPath">ドメインソケットのパス</param>
+        /// <param name="bufferSize">バッファサイズ</param>
+        /// <param name="ignoreBindErrors">バインドエラーを無視するかどうか</param>
+        /// <returns>バインドされたUDPサーバー</returns>
+        public static SocketUdpServer BindUds(string domainSocketPath, int bufferSize, bool ignoreBindErrors = false)
         {
             var server = new SocketUdpServer(bufferSize, AddressFamily.Unix, ProtocolType.IP);
-            server.socket.Bind(new UnixDomainSocketEndPoint(domainSocketPath));
+            try
+            {
+                server.socket.Bind(new UnixDomainSocketEndPoint(domainSocketPath));
+            }
+            catch (SocketException ex)
+            {
+                // バインドに失敗した場合
+                server.IsValid = false;
+                
+                // ignoreBindErrors が false の場合は例外を再スロー
+                if (!ignoreBindErrors)
+                {
+                    throw new InvalidOperationException($"Failed to bind Unix domain socket to path {domainSocketPath}. This may be due to permissions or configuration.", ex);
+                }
+                // ignoreBindErrors が true の場合は例外を無視
+            }
             return server;
         }
 #endif
+
         public async UniTask<ReadOnlyMemory<byte>> ReceiveAsync(CancellationToken cancellationToken)
         {
+            // 無効状態の場合は空のデータを返す
+            if (!IsValid)
+            {
+                return new ReadOnlyMemory<byte>(Array.Empty<byte>());
+            }
+            
 #if NET5_0_OR_GREATER
             int i = await socket.ReceiveAsync(buffer, SocketFlags.None, cancellationToken).ConfigureAwait(false);
             return buffer.AsMemory(0, i);
 #else
             var tcs = new UniTaskCompletionSource<ReadOnlyMemory<byte>>();
-            socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ar =>
+            socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ar => 
             {
                 int i;
                 try { i = socket.EndReceive(ar); }
@@ -49,6 +108,7 @@ namespace MessagePipe.Interprocess.Workers
             return await tcs.Task;
 #endif
         }
+        
         public void Dispose()
         {
             socket.Dispose();
@@ -85,8 +145,8 @@ namespace MessagePipe.Interprocess.Workers
         /// <param name="host">送信先ホスト（通常はIP文字列）</param>
         /// <param name="port">送信先ポート</param>
         /// <param name="bufferSize">バッファサイズ</param>
-        /// <param name="subnetMask">サブネットマスク（例:"255.255.255.0"） ※任意</param>
-        /// <param name="networkAddress">ネットワークアドレス（例:"192.168.1.0"） ※任意</param>
+        /// <param name="subnetMask">サブネットマスク（例: 255.255.255.0 ） ※任意</param>
+        /// <param name="networkAddress">ネットワークアドレス（例: 192.168.1.0 ） ※任意</param>
         /// <returns></returns>
         public static SocketUdpClient Connect(string host, int port, int bufferSize, string subnetMask = null, string networkAddress = null)
         {
@@ -203,7 +263,7 @@ namespace MessagePipe.Interprocess.Workers
             return socket.SendToAsync(data, SocketFlags.None, endpoint, cancellationToken);
 #else
             var tcs = new UniTaskCompletionSource<int>();
-            socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, endpoint, ar =>
+            socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, endpoint, ar => 
             {
                 try { tcs.TrySetResult(socket.EndSendTo(ar)); }
                 catch (Exception ex) { tcs.TrySetException(ex); }

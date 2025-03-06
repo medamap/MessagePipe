@@ -19,14 +19,46 @@ namespace MessagePipe.Interprocess
 
         public UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = default)
         {
-            worker.Publish(key, message, null); // Use default address
+            try
+            {
+                worker.Publish(key, message, null); // Use default address
+            }
+            catch (Exception ex)
+            {
+                // IgnoreSendErrorsが有効な場合は例外を無視
+                if (worker.Options is MessagePipeInterprocessUdpOptions udpOptions && udpOptions.IgnoreSendErrors)
+                {
+                    // 例外を無視して続行
+                }
+                else
+                {
+                    // それ以外は例外を再スロー
+                    throw;
+                }
+            }
             return default;
         }
 
         // オーバーロードメソッドの追加: 送信先アドレスを動的に指定できるようにする
         public UniTask PublishAsync(TKey key, TMessage message, string toAddress, CancellationToken cancellationToken = default)
         {
-            worker.Publish(key, message, toAddress); // Use specified address
+            try
+            {
+                worker.Publish(key, message, toAddress); // Use specified address
+            }
+            catch (Exception ex)
+            {
+                // IgnoreSendErrorsが有効な場合は例外を無視
+                if (worker.Options is MessagePipeInterprocessUdpOptions udpOptions && udpOptions.IgnoreSendErrors)
+                {
+                    // 例外を無視して続行
+                }
+                else
+                {
+                    // それ以外は例外を再スロー
+                    throw;
+                }
+            }
             return default;
         }
     }
@@ -48,8 +80,25 @@ namespace MessagePipe.Interprocess
             this.syncHandlerFactory = syncHandlerFactory;
             this.asyncHandlerFactory = asyncHandlerFactory;
 
-            worker.StartReceiver();
+            try
+            {
+                worker.StartReceiver();
+            }
+            catch (Exception ex)
+            {
+                // IgnoreBindErrorsが有効な場合は例外を無視
+                if (options.IgnoreBindErrors)
+                {
+                    options.UnhandledErrorHandler("Failed to start UDP receiver, but continuing due to IgnoreBindErrors option.", ex);
+                }
+                else
+                {
+                    // それ以外は例外を再スロー
+                    throw;
+                }
+            }
         }
+
 #if NET5_0_OR_GREATER
         [Preserve]
         public UdpDistributedSubscriber(UdpWorker worker, MessagePipeInterprocessUdpUdsOptions options, IAsyncSubscriber<IInterprocessKey, IInterprocessValue> subscriberCore, FilterAttachedMessageHandlerFactory syncHandlerFactory, FilterAttachedAsyncMessageHandlerFactory asyncHandlerFactory)
@@ -59,9 +108,26 @@ namespace MessagePipe.Interprocess
             this.syncHandlerFactory = syncHandlerFactory;
             this.asyncHandlerFactory = asyncHandlerFactory;
 
-            worker.StartReceiver();
+            try
+            {
+                worker.StartReceiver();
+            }
+            catch (Exception ex)
+            {
+                // IgnoreBindErrorsが有効な場合は例外を無視
+                if (options is MessagePipeInterprocessUdpUdsOptions udpUdsOptions && udpUdsOptions.IgnoreBindErrors)
+                {
+                    options.UnhandledErrorHandler("Failed to start UDP receiver, but continuing due to IgnoreBindErrors option.", ex);
+                }
+                else
+                {
+                    // それ以外は例外を再スロー
+                    throw;
+                }
+            }
         }
 #endif
+
         public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, CancellationToken cancellationToken = default)
         {
             return SubscribeAsync(key, handler, Array.Empty<MessageHandlerFilter<TMessage>>(), cancellationToken);
@@ -93,6 +159,4 @@ namespace MessagePipe.Interprocess
             return new UniTask<IUniTaskAsyncDisposable>(new AsyncDisposableBridge(d));
         }
     }
-
-    
 }
