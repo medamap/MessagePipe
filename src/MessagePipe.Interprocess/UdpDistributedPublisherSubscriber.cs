@@ -31,6 +31,7 @@ namespace MessagePipe.Interprocess
                 {
                     // 例外を再スロー（UdpWorker 内部で IgnoreSendErrors が処理される）
                     throw;
+                }
                 else
                 {
                     // それ以外は例外を再スロー
