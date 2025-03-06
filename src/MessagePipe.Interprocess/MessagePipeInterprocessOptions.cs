@@ -43,13 +43,15 @@ namespace MessagePipe.Interprocess
         /// </summary>
         public bool IgnoreSendErrors { get; set; } = false;
 
-        public MessagePipeInterprocessUdpOptions(string host, int port, string? subnetMask = null, string? networkAddress = null)
+        public MessagePipeInterprocessUdpOptions(string host, int port, string? subnetMask = null, string? networkAddress = null, bool ignoreBindErrors = false, bool ignoreSendErrors = false)
             : base()
         {
             this.Host = host;
             this.Port = port;
             this.SubnetMask = subnetMask ?? string.Empty;
             this.NetworkAddress = networkAddress ?? string.Empty;
+            this.IgnoreBindErrors = ignoreBindErrors;
+            this.IgnoreSendErrors = ignoreSendErrors;
         }
     }
 
