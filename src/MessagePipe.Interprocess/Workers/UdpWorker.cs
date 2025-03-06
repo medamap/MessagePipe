@@ -1,6 +1,7 @@
 ﻿using MessagePipe.Interprocess.Internal;
 using System;
 using System.Threading;
+using System.Net.Sockets;
 #if !UNITY_2018_3_OR_NEWER
 using System.Threading.Channels;
 #else
@@ -22,6 +23,7 @@ namespace MessagePipe.Interprocess.Workers
         readonly CancellationTokenSource cancellationTokenSource;
         readonly IAsyncPublisher<IInterprocessKey, IInterprocessValue> publisher;
         readonly MessagePipeInterprocessOptions options;
+        public MessagePipeInterprocessOptions Options => options;
 
         // Channel is used from publisher for thread safety of write packet
         int initializedServer = 0;

@@ -2,6 +2,7 @@
 using MessagePipe.Interprocess.Workers;
 using System;
 using System.Threading;
+using System.Net.Sockets;
 using Cysharp.Threading.Tasks;
 
 namespace MessagePipe.Interprocess
@@ -26,10 +27,10 @@ namespace MessagePipe.Interprocess
             catch (Exception ex)
             {
                 // IgnoreSendErrorsが有効な場合は例外を無視
-                if (worker.Options is MessagePipeInterprocessUdpOptions udpOptions && udpOptions.IgnoreSendErrors)
+                if (ex is SocketException && worker is UdpWorker)
                 {
-                    // 例外を無視して続行
-                }
+                    // 例外を再スロー（UdpWorker 内部で IgnoreSendErrors が処理される）
+                    throw;
                 else
                 {
                     // それ以外は例外を再スロー
