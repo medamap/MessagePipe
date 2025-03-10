@@ -7,6 +7,10 @@ using Cysharp.Threading.Tasks;
 
 namespace MessagePipe.Interprocess
 {
+    public interface IToAdressable {
+        string GetToAddress();
+    }
+    
     [Preserve]
     public sealed class UdpDistributedPublisher<TKey, TMessage> : IDistributedPublisher<TKey, TMessage>
     {
@@ -22,6 +26,19 @@ namespace MessagePipe.Interprocess
         {
             try
             {
+                // メッセージが IToAdressable を実装しているかチェック
+                if (message is IToAdressable addressable)
+                {
+                    // GetToAddress() を呼び出してアドレスを取得し、オーバーロードメソッドを呼び出す
+                    string toAddress = addressable.GetToAddress();
+                    if (!string.IsNullOrEmpty(toAddress))
+                    {
+                        // アドレスが取得できた場合は、toAddress を指定するオーバーロードを呼び出す
+                        return PublishAsync(key, message, toAddress, cancellationToken);
+                    }
+                }
+        
+                // IToAdressable を実装していない、またはアドレスが取得できなかった場合は従来の処理
                 worker.Publish(key, message, null); // Use default address
             }
             catch (Exception ex)
