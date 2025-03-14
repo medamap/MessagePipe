@@ -8,7 +8,7 @@ namespace MessagePipe.Interprocess.Workers
 {
     // TODO:TCP STREAM AND READ
 
-    internal sealed class SocketTcpServer : IDisposable
+    public sealed class SocketTcpServer : IDisposable
     {
         const int MaxConnections = 0x7fffffff;
 

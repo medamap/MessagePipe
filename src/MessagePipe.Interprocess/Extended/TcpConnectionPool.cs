@@ -72,7 +72,7 @@ namespace MessagePipe.Interprocess
     /// <summary>
     /// TCP接続を管理するプールクラス
     /// </summary>
-    internal class TcpConnectionPool : IDisposable
+    public class TcpConnectionPool : IDisposable
     {
         private readonly ConcurrentDictionary<string, TcpConnectionInfo> _connections = new ConcurrentDictionary<string, TcpConnectionInfo>();
         private readonly TimeSpan _connectionTimeout;
