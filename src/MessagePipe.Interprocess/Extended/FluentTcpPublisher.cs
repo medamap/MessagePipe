@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using MessagePipe.Interprocess.Workers;
 
-namespace MessagePipe.Interprocess.Extended
+namespace MessagePipe.Interprocess
 {
     /// <summary>
     /// Fluent APIを提供するTCPパブリッシャー

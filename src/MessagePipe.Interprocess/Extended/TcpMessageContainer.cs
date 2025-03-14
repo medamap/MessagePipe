@@ -1,6 +1,6 @@
 using System;
 
-namespace MessagePipe.Interprocess.Extended
+namespace MessagePipe.Interprocess
 {
     /// <summary>
     /// TCP送信用のメッセージコンテナ

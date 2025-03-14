@@ -1,6 +1,6 @@
 using System;
 
-namespace MessagePipe.Interprocess.Extended
+namespace MessagePipe.Interprocess
 {
     /// <summary>
     /// 送信先アドレスを動的に指定するためのインターフェース

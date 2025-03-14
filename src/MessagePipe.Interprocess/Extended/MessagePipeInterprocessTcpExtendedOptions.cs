@@ -2,7 +2,7 @@ using System;
 using MessagePack;
 using MessagePack.Resolvers;
 
-namespace MessagePipe.Interprocess.Extended
+namespace MessagePipe.Interprocess
 {
     ///  summary 
     /// TCP通信の拡張オプション
