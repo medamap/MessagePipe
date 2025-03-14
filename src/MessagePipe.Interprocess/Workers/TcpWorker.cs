@@ -166,22 +166,22 @@ namespace MessagePipe.Interprocess.Workers
                 {
                     // クライアント初期化に失敗した場合
                     Interlocked.Exchange(ref initializedClient, 0); // リセット
-                    
+            
                     // 拡張オプションの場合はエラー無視設定を確認
-                    bool ignoreErrors = options is MessagePipeInterprocessTcpExtendedOptions extOptions && extOptions.IgnoreConnectErrors;
+                    bool ignoreErrors = options is MessagePipeInterprocessTcpExtendedOptions extOptions1 && extOptions1.IgnoreConnectErrors;
                     if (ignoreErrors)
                     {
                         options.UnhandledErrorHandler?.Invoke("TCP client initialization failed, but continuing due to IgnoreConnectErrors option.", ex);
                         return;
                     }
-                    
+            
                     // それ以外は例外を再スロー
                     throw;
                 }
             }
 
             var buffer = MessageBuilder.BuildPubSubMessage(key, message, options.MessagePackSerializerOptions);
-            
+    
             // メッセージコンテナを作成して送信キューに追加
             var container = new TcpMessageContainer
             {
@@ -189,14 +189,14 @@ namespace MessagePipe.Interprocess.Workers
                 ToAddress = targetAddress,
                 Port = targetPort
             };
-            
+    
             // 拡張オプションの場合は追加設定を適用
-            if (options is MessagePipeInterprocessTcpExtendedOptions extOptions)
+            if (options is MessagePipeInterprocessTcpExtendedOptions extOptions2)
             {
-                container.RetryCount = extOptions.MaxRetryCount;
-                container.Timeout = extOptions.SendTimeout;
+                container.RetryCount = extOptions2.MaxRetryCount;
+                container.Timeout = extOptions2.SendTimeout;
             }
-            
+    
             channel.Writer.TryWrite(container);
         }
 
