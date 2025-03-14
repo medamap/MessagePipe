@@ -1,15 +1,24 @@
 {
   "name": "jp.megamin.messagepipe.interprocess",
-  "displayName": "MessagePipe.Interprocess",
-  "version": "1.8.1",
+  "displayName": "MessagePipe.Interprocess (Extended)",
+  "version": "1.8.1-extended.1",
   "unity": "2018.4",
-  "description": "MessagePipe Interprocess Extension.",
+  "description": "MessagePipe Interprocess Extension with TCP enhancements. Based on original work by Cysharp.",
   "keywords": [
     "pubsub",
     "event",
     "Scripting",
-    "DI"
+    "DI",
+    "TCP",
+    "networking"
   ],
   "license": "MIT",
-  "category": "Scripting"
+  "category": "Scripting",
+  "author": {
+    "name": "Cysharp, Inc.",
+    "url": "https://github.com/Cysharp/MessagePipe"
+  },
+  "contributors": [
+    "Poppo Koubou"
+  ]
 }

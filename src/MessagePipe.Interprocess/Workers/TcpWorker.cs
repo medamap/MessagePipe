@@ -1,4 +1,5 @@
 ﻿using MessagePack;
+using MessagePipe.Interprocess.Extended;
 using MessagePipe.Interprocess.Internal;
 #if !UNITY_2018_3_OR_NEWER
 using Microsoft.Extensions.DependencyInjection;
@@ -25,10 +26,13 @@ namespace MessagePipe.Interprocess.Workers
         // Channel is used from publisher for thread safety of write packet
         int initializedServer = 0;
         Lazy<SocketTcpServer> server;
-        Channel<byte[]> channel;
+        Channel<TcpMessageContainer> channel;
 
         int initializedClient = 0;
         Lazy<SocketTcpClient> client;
+
+        // 接続プール
+        private TcpConnectionPool connectionPool;
 
         // request-response
         int messageId = 0;
@@ -43,32 +47,36 @@ namespace MessagePipe.Interprocess.Workers
             this.options = options;
             this.publisher = publisher;
 
-            this.server = new Lazy<SocketTcpServer>(() =>
+            this.server = new Lazy<SocketTcpServer>(() => 
             {
                 return SocketTcpServer.Listen(options.Host, options.Port);
             });
 
-            this.client = new Lazy<SocketTcpClient>(() =>
+            this.client = new Lazy<SocketTcpClient>(() => 
             {
                 return SocketTcpClient.Connect(options.Host, options.Port);
             });
 
 #if !UNITY_2018_3_OR_NEWER
-            this.channel = Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions()
+            this.channel = Channel.CreateUnbounded<TcpMessageContainer>(new UnboundedChannelOptions()
             {
                 SingleReader = true,
                 SingleWriter = false,
                 AllowSynchronousContinuations = true
             });
 #else
-            this.channel = Channel.CreateSingleConsumerUnbounded<byte[]>();
+            this.channel = Channel.CreateSingleConsumerUnbounded<TcpMessageContainer>();
 #endif
+
+            // 接続プールの初期化
+            InitializeConnectionPool();
 
             if (options.HostAsServer != null && options.HostAsServer.Value)
             {
                 StartReceiver();
             }
         }
+
 #if NET5_0_OR_GREATER
         [Preserve]
         public TcpWorker(IServiceProvider provider, MessagePipeInterprocessTcpUdsOptions options, IAsyncPublisher<IInterprocessKey, IInterprocessValue> publisher)
@@ -78,26 +86,29 @@ namespace MessagePipe.Interprocess.Workers
             this.options = options;
             this.publisher = publisher;
 
-            this.server = new Lazy<SocketTcpServer>(() =>
+            this.server = new Lazy<SocketTcpServer>(() => 
             {
                 return SocketTcpServer.ListenUds(options.SocketPath);
             });
 
-            this.client = new Lazy<SocketTcpClient>(() =>
+            this.client = new Lazy<SocketTcpClient>(() => 
             {
                 return SocketTcpClient.ConnectUds(options.SocketPath);
             });
 
 #if !UNITY_2018_3_OR_NEWER
-            this.channel = Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions()
+            this.channel = Channel.CreateUnbounded<TcpMessageContainer>(new UnboundedChannelOptions()
             {
                 SingleReader = true,
                 SingleWriter = false,
                 AllowSynchronousContinuations = true
             });
 #else
-            this.channel = Channel.CreateSingleConsumerUnbounded<byte[]>();
+            this.channel = Channel.CreateSingleConsumerUnbounded<TcpMessageContainer>();
 #endif
+
+            // 接続プールの初期化
+            InitializeConnectionPool();
 
             if (options.HostAsServer != null && options.HostAsServer.Value)
             {
@@ -105,16 +116,97 @@ namespace MessagePipe.Interprocess.Workers
             }
         }
 #endif
+
+        /// <summary>
+        /// 接続プールを初期化
+        /// </summary>
+        private void InitializeConnectionPool()
+        {
+            TimeSpan connectionTimeout = TimeSpan.FromMinutes(5);
+            TimeSpan cleanupInterval = TimeSpan.FromMinutes(1);
+
+            if (options is MessagePipeInterprocessTcpExtendedOptions extOptions)
+            {
+                connectionTimeout = extOptions.IdleConnectionTimeout;
+                cleanupInterval = extOptions.ConnectionPoolCleanupInterval;
+            }
+
+            connectionPool = new TcpConnectionPool(options, connectionTimeout, cleanupInterval);
+        }
+
+        /// <summary>
+        /// メッセージをシリアライズ
+        /// </summary>
+        public byte[] SerializeMessage<TKey, TMessage>(TKey key, TMessage message)
+        {
+            return MessageBuilder.BuildPubSubMessage(key, message, options.MessagePackSerializerOptions);
+        }
+
+        /// <summary>
+        /// 従来のPublishメソッド
+        /// </summary>
         public void Publish<TKey, TMessage>(TKey key, TMessage message)
+        {
+            // デフォルトの送信先を使用
+            PublishToTarget(key, message, null, null);
+        }
+
+        /// <summary>
+        /// 送信先を指定してメッセージを発行
+        /// </summary>
+        public void PublishToTarget<TKey, TMessage>(TKey key, TMessage message, string targetAddress, int? targetPort = null)
         {
             if (Interlocked.Increment(ref initializedClient) == 1) // first incr, channel not yet started
             {
-                _ = client.Value; // init
-                RunPublishLoop();
+                try
+                {
+                    _ = client.Value; // init
+                    RunPublishLoop();
+                }
+                catch (Exception ex)
+                {
+                    // クライアント初期化に失敗した場合
+                    Interlocked.Exchange(ref initializedClient, 0); // リセット
+                    
+                    // 拡張オプションの場合はエラー無視設定を確認
+                    bool ignoreErrors = options is MessagePipeInterprocessTcpExtendedOptions extOptions && extOptions.IgnoreConnectErrors;
+                    if (ignoreErrors)
+                    {
+                        options.UnhandledErrorHandler?.Invoke("TCP client initialization failed, but continuing due to IgnoreConnectErrors option.", ex);
+                        return;
+                    }
+                    
+                    // それ以外は例外を再スロー
+                    throw;
+                }
             }
 
             var buffer = MessageBuilder.BuildPubSubMessage(key, message, options.MessagePackSerializerOptions);
-            channel.Writer.TryWrite(buffer);
+            
+            // メッセージコンテナを作成して送信キューに追加
+            var container = new TcpMessageContainer
+            {
+                Data = buffer,
+                ToAddress = targetAddress,
+                Port = targetPort
+            };
+            
+            // 拡張オプションの場合は追加設定を適用
+            if (options is MessagePipeInterprocessTcpExtendedOptions extOptions)
+            {
+                container.RetryCount = extOptions.MaxRetryCount;
+                container.Timeout = extOptions.SendTimeout;
+            }
+            
+            channel.Writer.TryWrite(container);
+        }
+
+        /// <summary>
+        /// Fluent APIを使用するためのファクトリーメソッド
+        /// </summary>
+        public FluentTcpPublisher CreatePublisher()
+        {
+            return new FluentTcpPublisher(this, connectionPool, options);
         }
 
         public async UniTask<TResponse> RequestAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken)
@@ -129,7 +221,24 @@ namespace MessagePipe.Interprocess.Workers
             var tcs = new UniTaskCompletionSource<IInterprocessValue>();
             responseCompletions[mid] = tcs;
             var buffer = MessageBuilder.BuildRemoteRequestMessage(typeof(TRequest), typeof(TResponse), mid, request, options.MessagePackSerializerOptions);
-            channel.Writer.TryWrite(buffer);
+            
+            // メッセージコンテナを作成して送信キューに追加
+            var container = new TcpMessageContainer
+            {
+                Data = buffer,
+                ToAddress = null, // デフォルトの送信先を使用
+                Port = null
+            };
+            
+            // 拡張オプションの場合は追加設定を適用
+            if (options is MessagePipeInterprocessTcpExtendedOptions extOptions)
+            {
+                container.RetryCount = extOptions.MaxRetryCount;
+                container.Timeout = extOptions.SendTimeout;
+            }
+            
+            channel.Writer.TryWrite(container);
+            
             var memoryValue = await tcs.Task.ConfigureAwait(false);
             return MessagePackSerializer.Deserialize<TResponse>(memoryValue.ValueMemory, options.MessagePackSerializerOptions);
         }
@@ -148,12 +257,57 @@ namespace MessagePipe.Interprocess.Workers
                 {
                     try
                     {
-                        await tcpClient.SendAsync(item, token).ConfigureAwait(false);
+                        // 送信先が指定されている場合は接続プールから取得または作成
+                        SocketTcpClient targetClient;
+                        if (!string.IsNullOrEmpty(item.ToAddress) && item.Port.HasValue)
+                        {
+                            targetClient = await connectionPool.GetOrCreateConnectionAsync(item.ToAddress, item.Port.Value, token);
+                            if (targetClient == null)
+                            {
+                                // 接続の取得に失敗した場合
+                                bool ignoreErrors = options is MessagePipeInterprocessTcpExtendedOptions extOptions && extOptions.IgnoreConnectErrors;
+                                if (ignoreErrors)
+                                {
+                                    options.UnhandledErrorHandler?.Invoke($"Failed to get connection to {item.ToAddress}:{item.Port}, but continuing due to IgnoreConnectErrors option.", null);
+                                    continue; // 次のメッセージへ
+                                }
+                                else
+                                {
+                                    throw new InvalidOperationException($"Failed to get connection to {item.ToAddress}:{item.Port}");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // デフォルトの接続を使用
+                            targetClient = tcpClient;
+                        }
+                        
+                        await targetClient.SendAsync(item.Data, token).ConfigureAwait(false);
+                        
+                        // 送信成功
+                        item.State = TcpMessageState.Completed;
+                        item.CompletionCallback?.Invoke();
                     }
                     catch (Exception ex)
                     {
                         if (ex is OperationCanceledException) return;
                         if (token.IsCancellationRequested) return;
+
+                        // エラーコールバックが設定されている場合は呼び出し
+                        if (item.ErrorCallback != null)
+                        {
+                            item.ErrorCallback(ex);
+                            continue; // 次のメッセージへ
+                        }
+                        
+                        // 送信エラーの処理
+                        bool ignoreErrors = options is MessagePipeInterprocessTcpExtendedOptions extOptions && extOptions.IgnoreSendErrors;
+                        if (ignoreErrors)
+                        {
+                            options.UnhandledErrorHandler?.Invoke("Network send error, continuing due to IgnoreSendErrors option.", ex);
+                            continue; // 次のメッセージへ
+                        }
 
                         // network error, terminate.
                         options.UnhandledErrorHandler("network error, publish loop will terminate." + Environment.NewLine, ex);
@@ -359,6 +513,8 @@ namespace MessagePipe.Interprocess.Workers
             {
                 client.Value.Dispose();
             }
+            
+            connectionPool?.Dispose();
         }
     }
 }
