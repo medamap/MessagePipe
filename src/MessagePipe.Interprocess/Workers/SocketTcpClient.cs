@@ -78,7 +78,7 @@ namespace MessagePipe.Interprocess.Workers
         }
     }
 
-    internal sealed class SocketTcpClient : IDisposable
+    public sealed class SocketTcpClient : IDisposable
     {
         readonly Socket socket;
 
