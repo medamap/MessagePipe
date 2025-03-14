@@ -1,5 +1,6 @@
 using System;
-using System.Generic;
+using System.Collections;
+using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Threading;
@@ -12,7 +13,7 @@ namespace MessagePipe.Interprocess
     /// <summary>
     /// TCP接続情報を保持するクラス
     /// </summary>
-    internal class TcpConnectionInfo
+    public class TcpConnectionInfo
     {
         /// <summary>
         /// 接続先アドレス

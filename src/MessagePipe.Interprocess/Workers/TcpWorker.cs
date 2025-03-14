@@ -1,5 +1,4 @@
 ﻿using MessagePack;
-using MessagePipe.Interprocess.Extended;
 using MessagePipe.Interprocess.Internal;
 #if !UNITY_2018_3_OR_NEWER
 using Microsoft.Extensions.DependencyInjection;

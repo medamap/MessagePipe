@@ -70,7 +70,7 @@ namespace MessagePipe.Interprocess
         }
     }
 
-    public sealed class MessagePipeInterprocessTcpOptions : MessagePipeInterprocessOptions
+    public class MessagePipeInterprocessTcpOptions : MessagePipeInterprocessOptions
     {
         public string Host { get; }
         public int Port { get; }

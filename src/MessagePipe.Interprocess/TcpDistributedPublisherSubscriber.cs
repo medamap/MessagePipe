@@ -1,5 +1,4 @@
-﻿using MessagePipe.Interprocess.Extended;
-using MessagePipe.Interprocess.Internal;
+﻿using MessagePipe.Interprocess.Internal;
 using MessagePipe.Interprocess.Workers;
 using System;
 using System.Threading;
