@@ -7,7 +7,10 @@ using Cysharp.Threading.Tasks;
 
 namespace MessagePipe.Interprocess
 {
-    public interface IToAdressable {
+    // 注意: IToAdressable インターフェースは削除せず、IToAddressable と同じ定義にする
+    // これにより後方互換性を保ちつつ、新しいコードでは IToAddressable を使用できる
+    public interface IToAdressable
+    {
         string GetToAddress();
     }
     
@@ -15,39 +18,60 @@ namespace MessagePipe.Interprocess
     public sealed class UdpDistributedPublisher<TKey, TMessage> : IDistributedPublisher<TKey, TMessage>
     {
         readonly UdpWorker worker;
+        readonly MessagePipeInterprocessOptions options;
 
         [Preserve]
-        public UdpDistributedPublisher(UdpWorker worker)
+        public UdpDistributedPublisher(UdpWorker worker, MessagePipeInterprocessOptions options)
         {
             this.worker = worker;
+            this.options = options;
         }
 
         public UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = default)
         {
             try
             {
-                // メッセージが IToAdressable を実装しているかチェック
-                if (message is IToAdressable addressable)
+                // 両方のインターフェースをチェック（後方互換性のため）
+                if (message is IToAddressable addressable)
                 {
-                    // GetToAddress() を呼び出してアドレスを取得し、オーバーロードメソッドを呼び出す
                     string toAddress = addressable.GetToAddress();
                     if (!string.IsNullOrEmpty(toAddress))
                     {
-                        // アドレスが取得できた場合は、toAddress を指定するオーバーロードを呼び出す
-                        return PublishAsync(key, message, toAddress, cancellationToken);
+                        // ポート指定もサポート
+                        int? port = null;
+                        if (message is IToPortable portable)
+                        {
+                            int toPort = portable.GetPort();
+                            if (toPort > 0)
+                            {
+                                port = toPort;
+                            }
+                        }
+                        
+                        // 新しいオーバーロードを呼び出す
+                        return PublishToTargetAsync(key, message, toAddress, port, cancellationToken);
+                    }
+                }
+                else if (message is IToAdressable oldAddressable) // 古いインターフェースもサポート
+                {
+                    string toAddress = oldAddressable.GetToAddress();
+                    if (!string.IsNullOrEmpty(toAddress))
+                    {
+                        // 古いインターフェースの場合はポート指定なし
+                        return PublishToTargetAsync(key, message, toAddress, null, cancellationToken);
                     }
                 }
         
-                // IToAdressable を実装していない、またはアドレスが取得できなかった場合は従来の処理
-                worker.Publish(key, message, null); // Use default address
+                // 従来の処理
+                worker.Publish(key, message, null); // デフォルトアドレス使用
             }
             catch (Exception ex)
             {
                 // IgnoreSendErrorsが有効な場合は例外を無視
-                if (ex is SocketException && worker is UdpWorker)
+                bool ignoreErrors = options is MessagePipeInterprocessUdpOptions udpOptions && udpOptions.IgnoreSendErrors;
+                if (ignoreErrors)
                 {
-                    // 例外を再スロー（UdpWorker 内部で IgnoreSendErrors が処理される）
-                    throw;
+                    options.UnhandledErrorHandler?.Invoke("UDP send error, but continuing due to IgnoreSendErrors option.", ex);
                 }
                 else
                 {
@@ -58,30 +82,44 @@ namespace MessagePipe.Interprocess
             return default;
         }
 
-        // オーバーロードメソッドの追加: 送信先アドレスを動的に指定できるようにする
-        public UniTask PublishAsync(TKey key, TMessage message, string toAddress, CancellationToken cancellationToken = default)
+        // 送信先アドレスとポートを指定するオーバーロード
+        public UniTask PublishToTargetAsync(TKey key, TMessage message, string toAddress, int? port = null, CancellationToken cancellationToken = default)
         {
             try
             {
-                worker.Publish(key, message, toAddress); // Use specified address
-            }
-            catch (Exception ex)
-            {
-                // IgnoreSendErrorsが有効な場合は例外を無視
-                if (worker.Options is MessagePipeInterprocessUdpOptions udpOptions && udpOptions.IgnoreSendErrors)
+                // ポート指定がある場合は新しいメソッドを使用
+                if (port.HasValue)
                 {
-                    // 例外を無視して続行
+                    worker.PublishToTarget(key, message, toAddress, port.Value);
                 }
                 else
                 {
-                    // それ以外は例外を再スロー
+                    worker.Publish(key, message, toAddress);
+                }
+            }
+            catch (Exception ex)
+            {
+                bool ignoreErrors = options is MessagePipeInterprocessUdpOptions udpOptions && udpOptions.IgnoreSendErrors;
+                if (ignoreErrors)
+                {
+                    options.UnhandledErrorHandler?.Invoke($"UDP send error to {toAddress}:{port}, but continuing due to IgnoreSendErrors option.", ex);
+                }
+                else
+                {
                     throw;
                 }
             }
             return default;
         }
+        
+        // Fluent APIを使用するためのファクトリーメソッド
+        public FluentUdpPublisher CreatePublisher()
+        {
+            return new FluentUdpPublisher(worker, options);
+        }
     }
 
+    // UdpDistributedSubscriber は変更なし - 完全に保持
     [Preserve]
     public sealed class UdpDistributedSubscriber<TKey, TMessage> : IDistributedSubscriber<TKey, TMessage>
     {

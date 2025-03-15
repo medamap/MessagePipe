@@ -255,6 +255,37 @@ namespace MessagePipe.Interprocess.Workers
         }
 
         /// <summary>
+        /// 指定されたアドレスとポートにデータを送信します
+        /// </summary>
+        public UniTask<int> SendToAsync(byte[] data, string toAddress, int port, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(toAddress))
+            {
+                return SendAsync(data, cancellationToken);
+            }
+
+            try
+            {
+                IPAddress targetIP = IPAddress.Parse(toAddress);
+                bool isBroadcast = targetIP.Equals(IPAddress.Broadcast) || toAddress == "255.255.255.255";
+        
+                // ブロードキャストの場合はソケットオプションを設定
+                if (isBroadcast)
+                {
+                    socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
+                }
+        
+                var endpoint = new IPEndPoint(targetIP, port);
+                return SendToEndpointAsync(data, endpoint, cancellationToken);
+            }
+            catch (Exception)
+            {
+                // アドレス解析に失敗した場合はデフォルトエンドポイントを使用
+                return SendAsync(data, cancellationToken);
+            }
+        }
+        
+        /// <summary>
         /// 指定されたエンドポイントにデータを送信します
         /// </summary>
         private UniTask<int> SendToEndpointAsync(byte[] data, EndPoint endpoint, CancellationToken cancellationToken = default)

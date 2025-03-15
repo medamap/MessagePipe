@@ -15,6 +15,7 @@ namespace MessagePipe.Interprocess.Workers
     {
         public byte[] Data { get; set; }
         public string ToAddress { get; set; }
+        public int? Port { get; set; } // ポート番号を追加
     }
 
     [Preserve]
@@ -153,7 +154,51 @@ namespace MessagePipe.Interprocess.Workers
             channel.Writer.TryWrite(new UdpMessageContainer { Data = buffer, ToAddress = toAddress });
         }
 
+        /// <summary>
+        /// 送信先アドレスとポートを指定してメッセージを発行します
+        /// </summary>
+        public void PublishToTarget<TKey, TMessage>(TKey key, TMessage message, string targetAddress, int targetPort)
+        {
+            if (Interlocked.Increment(ref initializedClient) == 1) // first incr, channel not yet started
+            {
+                try
+                {
+                    _ = client.Value; // init
+                    RunPublishLoop();
+                }
+                catch (Exception ex)
+                {
+                    // クライアント初期化に失敗した場合
+                    Interlocked.Exchange(ref initializedClient, 0); // リセット
+            
+                    // IgnoreSendErrorsが有効な場合は例外を無視
+                    if (options is MessagePipeInterprocessUdpOptions udpOptions && udpOptions.IgnoreSendErrors)
+                    {
+                        options.UnhandledErrorHandler("UDP client initialization failed, but continuing due to IgnoreSendErrors option.", ex);
+                        return;
+                    }
+            
+                    // それ以外は例外を再スロー
+                    throw;
+                }
+            }
+
+            // クライアントが無効な場合は何もしない
+            if (!IsClientValid)
+            {
+                return;
+            }
+
+            var buffer = MessageBuilder.BuildPubSubMessage(key, message, options.MessagePackSerializerOptions);
+            channel.Writer.TryWrite(new UdpMessageContainer { 
+                Data = buffer, 
+                ToAddress = targetAddress,
+                Port = targetPort
+            });
+        }
+        
         // Send packet to udp socket from publisher
+
         async void RunPublishLoop()
         {
             var reader = channel.Reader;
@@ -172,11 +217,17 @@ namespace MessagePipe.Interprocess.Workers
                 {
                     try
                     {
-                        // 送信先アドレスが指定されている場合は特定のアドレスに送信、そうでなければデフォルト送信先を使用
-                        if (!string.IsNullOrEmpty(item.ToAddress))
+                        // 送信先アドレスとポートが指定されている場合
+                        if (!string.IsNullOrEmpty(item.ToAddress) && item.Port.HasValue)
+                        {
+                            await udpClient.SendToAsync(item.Data, item.ToAddress, item.Port.Value, token).ConfigureAwait(false);
+                        }
+                        // 送信先アドレスのみ指定されている場合
+                        else if (!string.IsNullOrEmpty(item.ToAddress))
                         {
                             await udpClient.SendToAsync(item.Data, item.ToAddress, token).ConfigureAwait(false);
                         }
+                        // デフォルト送信先を使用
                         else
                         {
                             await udpClient.SendAsync(item.Data, token).ConfigureAwait(false);
@@ -184,6 +235,7 @@ namespace MessagePipe.Interprocess.Workers
                     }
                     catch (Exception ex)
                     {
+                        // 例外処理（変更なし）
                         if (ex is OperationCanceledException || token.IsCancellationRequested)
                             return;
 
