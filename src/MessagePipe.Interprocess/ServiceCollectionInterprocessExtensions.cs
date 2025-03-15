@@ -148,8 +148,6 @@ namespace MessagePipe
         public static IMessagePipeBuilder RegisterUpdInterprocessMessageBroker<TKey, TMessage>(this IMessagePipeBuilder builder, MessagePipeInterprocessOptions options)
         {
             AddAsyncMessageBroker<TKey, TMessage>(builder, options);
-            // オプションも登録
-            builder.Services.AddSingleton(options);
             builder.Services.Add(typeof(IDistributedPublisher<TKey, TMessage>), typeof(UdpDistributedPublisher<TKey, TMessage>), options.InstanceLifetime);
             builder.Services.Add(typeof(IDistributedSubscriber<TKey, TMessage>), typeof(UdpDistributedSubscriber<TKey, TMessage>), options.InstanceLifetime);
 

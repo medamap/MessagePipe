@@ -18,20 +18,11 @@ namespace MessagePipe.Interprocess
     public sealed class UdpDistributedPublisher<TKey, TMessage> : IDistributedPublisher<TKey, TMessage>
     {
         readonly UdpWorker worker;
-        readonly MessagePipeInterprocessOptions options;
 
-        [Preserve]
-        public UdpDistributedPublisher(UdpWorker worker, MessagePipeInterprocessOptions options)
-        {
-            this.worker = worker;
-            this.options = options;
-        }
-        
         [Preserve]
         public UdpDistributedPublisher(UdpWorker worker)
         {
             this.worker = worker;
-            this.options = worker.Options; // UdpWorkerからOptionsを取得
         }
 
         public UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = default)
@@ -74,17 +65,8 @@ namespace MessagePipe.Interprocess
             }
             catch (Exception ex)
             {
-                // IgnoreSendErrorsが有効な場合は例外を無視
-                bool ignoreErrors = options is MessagePipeInterprocessUdpOptions udpOptions && udpOptions.IgnoreSendErrors;
-                if (ignoreErrors)
-                {
-                    options.UnhandledErrorHandler?.Invoke("UDP send error, but continuing due to IgnoreSendErrors option.", ex);
-                }
-                else
-                {
-                    // それ以外は例外を再スロー
-                    throw;
-                }
+                // エラーを再スロー
+                throw;
             }
             return default;
         }
@@ -106,15 +88,8 @@ namespace MessagePipe.Interprocess
             }
             catch (Exception ex)
             {
-                bool ignoreErrors = options is MessagePipeInterprocessUdpOptions udpOptions && udpOptions.IgnoreSendErrors;
-                if (ignoreErrors)
-                {
-                    options.UnhandledErrorHandler?.Invoke($"UDP send error to {toAddress}:{port}, but continuing due to IgnoreSendErrors option.", ex);
-                }
-                else
-                {
-                    throw;
-                }
+                // エラーを再スロー
+                throw;
             }
             return default;
         }
@@ -122,7 +97,7 @@ namespace MessagePipe.Interprocess
         // Fluent APIを使用するためのファクトリーメソッド
         public FluentUdpPublisher CreatePublisher()
         {
-            return new FluentUdpPublisher(worker, options);
+            return new FluentUdpPublisher(worker, worker.Options);
         }
     }
     
