@@ -26,6 +26,13 @@ namespace MessagePipe.Interprocess
             this.worker = worker;
             this.options = options;
         }
+        
+        [Preserve]
+        public UdpDistributedPublisher(UdpWorker worker)
+        {
+            this.worker = worker;
+            this.options = worker.Options; // UdpWorkerからOptionsを取得
+        }
 
         public UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = default)
         {
@@ -118,7 +125,7 @@ namespace MessagePipe.Interprocess
             return new FluentUdpPublisher(worker, options);
         }
     }
-
+    
     // UdpDistributedSubscriber は変更なし - 完全に保持
     [Preserve]
     public sealed class UdpDistributedSubscriber<TKey, TMessage> : IDistributedSubscriber<TKey, TMessage>
