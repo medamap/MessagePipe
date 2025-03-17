@@ -22,7 +22,7 @@ namespace MessagePipe.Interprocess
         private TimeSpan _retryInterval = TimeSpan.FromMilliseconds(500);
         private Action<Exception> _errorCallback;
         private Action _completionCallback;
-        private bool _waitForCompletion = false;
+        private bool _waitForCompletion = true;
 
         /// <summary>
         /// コンストラクタ
