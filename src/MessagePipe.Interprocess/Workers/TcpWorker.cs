@@ -485,18 +485,18 @@ namespace MessagePipe.Interprocess.Workers
                     {
                         case MessageType.PubSub:
 #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
-    UnityEngine.Debug.Log($ [TCP RECEIVE] Received PubSub message );
-    // メッセージの内容をより詳細に表示
-    try {
-        var keyString = System.Text.Encoding.UTF8.GetString(message.KeyMemory.Span);
-        UnityEngine.Debug.Log($ [TCP RECEIVE] PubSub message key: {keyString} );
-    } catch {
-        UnityEngine.Debug.Log($ [TCP RECEIVE] Could not decode key as string );
-    }
+                            UnityEngine.Debug.Log($"[TCP RECEIVE] Received PubSub message"");
+                            // メッセージの内容をより詳細に表示
+                            try {
+                                var keyString = System.Text.Encoding.UTF8.GetString(message.KeyMemory.Span);
+                                UnityEngine.Debug.Log($"[TCP RECEIVE] PubSub message key: {keyString}");
+                            } catch {
+                                UnityEngine.Debug.Log($"[TCP RECEIVE] Could not decode key as string");
+                            }
 #endif
                             publisher.Publish(message, message, CancellationToken.None);
 #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
-    UnityEngine.Debug.Log($ [TCP RECEIVE] Published message to internal subscribers );
+                            UnityEngine.Debug.Log($"[TCP RECEIVE] Published message to internal subscribers");
 #endif
                             break;
                         case MessageType.RemoteRequest:
