@@ -96,12 +96,9 @@ namespace MessagePipe.Interprocess.Workers
         {
             try
             {
-                // ローカルエンドポイントを明示的に設定
-                var client = new SocketTcpClient(AddressFamily.InterNetwork, ProtocolType.Tcp);
-                client.socket.Bind(new IPEndPoint(IPAddress.Any, 0));
-        
-                // 相手のアドレスに接続
+                // 既存のメソッドを使用
                 var ip = new IPEndPoint(IPAddress.Parse(host), port);
+                var client = new SocketTcpClient(ip.AddressFamily, ProtocolType.Tcp);
                 client.socket.Connect(ip);
                 return client;
             }
@@ -112,6 +109,20 @@ namespace MessagePipe.Interprocess.Workers
             }
         }
 
+        public static SocketTcpClient ConnectWithLocalEndpoint(string host, int port)
+        {
+            try
+            {
+                // 既存のメソッドを使用して接続
+                return Connect(host, port);
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogError($"[TCP DEBUG] ConnectWithLocalEndpoint error: {ex.Message}\n{ex.StackTrace}");
+                throw;
+            }
+        }
+        
 #if NET5_0_OR_GREATER
         /// <summary>
         /// create TCP unix domain socket client and connect to server

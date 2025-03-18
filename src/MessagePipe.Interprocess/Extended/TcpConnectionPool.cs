@@ -126,10 +126,8 @@ namespace MessagePipe.Interprocess
 #if MESSAGEPIPE_TCP_SEND_DEBUG
                 UnityEngine.Debug.Log($"[TCP POOL] Creating new connection - Address: {address}, Port: {port}");
 #endif
-                // 修正: ローカルエンドポイントを明示的に設定
-                var client = new SocketTcpClient(AddressFamily.InterNetwork, ProtocolType.Tcp);
-                client.socket.Bind(new IPEndPoint(IPAddress.Any, 0));
-                client.socket.Connect(new IPEndPoint(IPAddress.Parse(address), port));
+                // 修正: 新しいConnectWithLocalEndpointメソッドを使用
+                var client = SocketTcpClient.ConnectWithLocalEndpoint(address, port);
                 
 #if MESSAGEPIPE_TCP_SEND_DEBUG
                 UnityEngine.Debug.Log($"[TCP POOL] Connection created successfully - Key: {key}");
