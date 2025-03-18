@@ -83,6 +83,11 @@ namespace MessagePipe.Interprocess
         public static IInterprocessKey CreateKey<TKey>(TKey key, MessagePackSerializerOptions options)
         {
             var bytes = MessagePackSerializer.Serialize(key, options);
+            // デバッグログを追加
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+            UnityEngine.Debug.Log($"[MessageBuilder] CreateKey for: {key}");
+            UnityEngine.Debug.Log($"[MessageBuilder] Key bytes: {BitConverter.ToString(bytes)}");
+#endif
             return new InterprocessMessage(MessageType.PubSub, bytes, 0, bytes.Length);
         }
 

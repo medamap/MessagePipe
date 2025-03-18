@@ -553,25 +553,6 @@ namespace MessagePipe.Interprocess.Workers
                                 UnityEngine.Debug.Log($"[TCP RECEIVE] Could not decode key as string");
                             }
 #endif
-// 登録されているサブスクライバーのキーを確認
-#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
-                            // サブスクライバーのキーを表示
-                            foreach (var subscriber in _subscribers)
-                            {
-                                try {
-                                    var subKeyBytes = BitConverter.ToString(subscriber.Key.KeyMemory.ToArray());
-                                    var subKeyString = System.Text.Encoding.UTF8.GetString(subscriber.Key.KeyMemory.Span);
-                                    UnityEngine.Debug.Log($"[TCP RECEIVE] Subscriber key bytes: {subKeyBytes}");
-                                    UnityEngine.Debug.Log($"[TCP RECEIVE] Subscriber key: {subKeyString}");
-                                    
-                                    // キーの比較結果を表示
-                                    var match = message.Equals(subscriber.Key);
-                                    UnityEngine.Debug.Log($"[TCP RECEIVE] Key match: {match}");
-                                } catch (Exception ex) {
-                                    UnityEngine.Debug.LogError($"[TCP RECEIVE] Error checking subscriber key: {ex.Message}");
-                                }
-                            }
-#endif
                             publisher.Publish(message, message, CancellationToken.None);
 #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
                             UnityEngine.Debug.Log($"[TCP RECEIVE] Published message to internal subscribers");

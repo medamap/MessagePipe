@@ -215,11 +215,22 @@ namespace MessagePipe.Interprocess
         {
             var byteKey = MessageBuilder.CreateKey(key, options.MessagePackSerializerOptions);
 #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
-    UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Subscribing to key: {key}");
+            UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Subscribing to key: {key}");
+#endif
+            // キーのバイト表現を確認
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+            UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Subscribing with key: {key}");
+            UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Key bytes: {BitConverter.ToString(byteKey.KeyMemory.ToArray())}");
+            try {
+                var keyString = System.Text.Encoding.UTF8.GetString(byteKey.KeyMemory.Span);
+                UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Key as string: {keyString}");
+            } catch {
+                UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Could not decode key as string");
+            }
 #endif
             var d = subscriberCore.Subscribe(byteKey, handler);
 #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
-    UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Subscription completed for key: {key}");
+            UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Subscription completed for key: {key}");
 #endif
             return new UniTask<IUniTaskAsyncDisposable>(new AsyncDisposableBridge(d));
         }
