@@ -94,11 +94,24 @@ namespace MessagePipe.Interprocess.Workers
 
         public static SocketTcpClient Connect(string host, int port)
         {
-            var ip = new IPEndPoint(IPAddress.Parse(host), port);
-            var client = new SocketTcpClient(ip.AddressFamily, ProtocolType.Tcp);
-            client.socket.Connect(ip);
-            return client;
+            try
+            {
+                // ローカルエンドポイントを明示的に設定
+                var client = new SocketTcpClient(AddressFamily.InterNetwork, ProtocolType.Tcp);
+                client.socket.Bind(new IPEndPoint(IPAddress.Any, 0));
+        
+                // 相手のアドレスに接続
+                var ip = new IPEndPoint(IPAddress.Parse(host), port);
+                client.socket.Connect(ip);
+                return client;
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogError($"[TCP DEBUG] Connect error: {ex.Message}\n{ex.StackTrace}");
+                throw;
+            }
         }
+
 #if NET5_0_OR_GREATER
         /// <summary>
         /// create TCP unix domain socket client and connect to server
@@ -108,12 +121,19 @@ namespace MessagePipe.Interprocess.Workers
         /// <returns>TCP socket client.</returns>
         public static SocketTcpClient ConnectUds(string domainSocketPath)
         {
-            var client = new SocketTcpClient(AddressFamily.Unix, ProtocolType.IP);
-            client.socket.Connect(new UnixDomainSocketEndPoint(domainSocketPath));
-            return client;
+            try
+            {
+                var client = new SocketTcpClient(AddressFamily.Unix, ProtocolType.IP);
+                client.socket.Connect(new UnixDomainSocketEndPoint(domainSocketPath));
+                return client;
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogError($"[TCP DEBUG] ConnectUds error: {ex.Message}\n{ex.StackTrace}");
+                throw;
+            }
         }
 #endif
-
         public async UniTask<int> ReceiveAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
 #if NET5_0_OR_GREATER
