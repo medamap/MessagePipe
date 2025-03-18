@@ -175,7 +175,11 @@ namespace MessagePipe.Interprocess.Workers
         public void PublishToTarget<TKey, TMessage>(TKey key, TMessage message, string targetAddress, int? targetPort = null)
         {
 #if MESSAGEPIPE_TCP_SEND_DEBUG
-    UnityEngine.Debug.Log($"[TCP SEND] PublishToTarget - Key: {key}, Message: {message}, TargetAddress: {targetAddress}, TargetPort: {targetPort}");
+            UnityEngine.Debug.Log($"[TCP SEND] PublishToTarget - Key: {key}, Message: {message}, TargetAddress: {targetAddress}, TargetPort: {targetPort}");
+            
+            // キーのバイト列を出力
+            var keyBytes = MessagePackSerializer.Serialize(key, options.MessagePackSerializerOptions);
+            UnityEngine.Debug.Log($"[TCP SEND] Key bytes: {BitConverter.ToString(keyBytes)}");
 #endif
             if (Interlocked.Increment(ref initializedClient) == 1) // first incr, channel not yet started
             {
