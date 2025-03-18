@@ -201,14 +201,26 @@ namespace MessagePipe.Interprocess
         public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, AsyncMessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
         {
             handler = asyncHandlerFactory.CreateAsyncMessageHandler(handler, filters);
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+    UnityEngine.Debug.Log($ [TCP SUBSCRIBE] Creating transform handler for key: {key} );
+#endif
             var transform = new TransformAsyncMessageHandler<TMessage>(handler, options.MessagePackSerializerOptions);
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+    UnityEngine.Debug.Log($ [TCP SUBSCRIBE] Subscribing with transform handler );
+#endif
             return SubscribeCore(key, transform);
         }
 
         UniTask<IUniTaskAsyncDisposable> SubscribeCore(TKey key, IAsyncMessageHandler<IInterprocessValue> handler)
         {
             var byteKey = MessageBuilder.CreateKey(key, options.MessagePackSerializerOptions);
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+    UnityEngine.Debug.Log($ [TCP SUBSCRIBE] Subscribing to key: {key} );
+#endif
             var d = subscriberCore.Subscribe(byteKey, handler);
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+    UnityEngine.Debug.Log($ [TCP SUBSCRIBE] Subscription completed for key: {key} );
+#endif
             return new UniTask<IUniTaskAsyncDisposable>(new AsyncDisposableBridge(d));
         }
     }
