@@ -304,7 +304,7 @@ namespace MessagePipe.Interprocess
                 {
                     // エラーを無視する場合はログに記録
 #if MESSAGEPIPE_TCP_SEND_DEBUG
-            UnityEngine.Debug.LogWarning($ [TCP FLUENT] Ignoring send errors due to IgnoreSendErrors option - ID: {container.MessageId} );
+            UnityEngine.Debug.LogWarning($"[TCP FLUENT] Ignoring send errors due to IgnoreSendErrors option - ID: {container.MessageId}");
 #endif
                     _options.UnhandledErrorHandler?.Invoke(
                         $"Failed to publish message to {container.ToAddress}:{container.Port} after {container.RetryCount} attempts, but continuing due to IgnoreSendErrors option.",
