@@ -99,6 +99,9 @@ namespace MessagePipe.Interprocess
         /// </summary>
         public async UniTask<SocketTcpClient> GetOrCreateConnectionAsync(string address, int port, CancellationToken cancellationToken = default)
         {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+    UnityEngine.Debug.Log($"[TCP POOL] GetOrCreateConnectionAsync - Address: {address}, Port: {port}");
+#endif
             if (_isDisposed)
             {
                 throw new ObjectDisposedException(nameof(TcpConnectionPool));
@@ -109,6 +112,9 @@ namespace MessagePipe.Interprocess
             // 既存の接続を確認
             if (_connections.TryGetValue(key, out var connectionInfo) && connectionInfo.IsValid)
             {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+        UnityEngine.Debug.Log($"[TCP POOL] Using existing connection - Key: {key}");
+#endif
                 connectionInfo.UpdateLastAccessTime();
                 return connectionInfo.Client;
             }
@@ -116,13 +122,22 @@ namespace MessagePipe.Interprocess
             // 新しい接続を作成
             try
             {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+        UnityEngine.Debug.Log($"[TCP POOL] Creating new connection - Address: {address}, Port: {port}");
+#endif
                 var client = SocketTcpClient.Connect(address, port);
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+        UnityEngine.Debug.Log($"[TCP POOL] Connection created successfully - Key: {key}");
+#endif
                 var newConnectionInfo = new TcpConnectionInfo(address, port, client);
                 _connections[key] = newConnectionInfo;
                 return client;
             }
             catch (SocketException ex)
             {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+        UnityEngine.Debug.LogError($"[TCP POOL] Connection failed - Address: {address}, Port: {port}, Error: {ex.Message}\n{ex.StackTrace}");
+#endif
                 // 接続エラーの処理
                 var tcpOptions = _options as MessagePipeInterprocessTcpOptions;
                 bool ignoreErrors = tcpOptions != null && 

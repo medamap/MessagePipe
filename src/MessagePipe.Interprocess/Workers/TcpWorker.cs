@@ -155,15 +155,24 @@ namespace MessagePipe.Interprocess.Workers
         /// </summary>
         public void PublishToTarget<TKey, TMessage>(TKey key, TMessage message, string targetAddress, int? targetPort = null)
         {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+    UnityEngine.Debug.Log($"[TCP SEND] PublishToTarget - Key: {key}, Message: {message}, TargetAddress: {targetAddress}, TargetPort: {targetPort}");
+#endif
             if (Interlocked.Increment(ref initializedClient) == 1) // first incr, channel not yet started
             {
                 try
                 {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+            UnityEngine.Debug.Log($"[TCP SEND] Initializing client for the first time");
+#endif
                     _ = client.Value; // init
                     RunPublishLoop();
                 }
                 catch (Exception ex)
                 {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+            UnityEngine.Debug.LogError($"[TCP SEND] Client initialization failed: {ex.Message}\n{ex.StackTrace}");
+#endif
                     // クライアント初期化に失敗した場合
                     Interlocked.Exchange(ref initializedClient, 0); // リセット
             
@@ -197,6 +206,9 @@ namespace MessagePipe.Interprocess.Workers
                 container.Timeout = extOptions2.SendTimeout;
             }
     
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+    UnityEngine.Debug.Log($"[TCP SEND] Adding message to channel - ID: {container.MessageId}, ToAddress: {container.ToAddress}, Port: {container.Port}");
+#endif
             channel.Writer.TryWrite(container);
         }
 
@@ -245,6 +257,9 @@ namespace MessagePipe.Interprocess.Workers
         // Send packet to tcp socket from publisher
         async void RunPublishLoop()
         {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+    UnityEngine.Debug.Log($"[TCP SEND] RunPublishLoop started");
+#endif
             var reader = channel.Reader;
             var token = cancellationTokenSource.Token;
             var tcpClient = client.Value;
@@ -252,17 +267,29 @@ namespace MessagePipe.Interprocess.Workers
 
             while (await reader.WaitToReadAsync(token).ConfigureAwait(false))
             {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+        UnityEngine.Debug.Log($"[TCP SEND] WaitToReadAsync completed, processing messages");
+#endif
                 while (reader.TryRead(out var item))
                 {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+            UnityEngine.Debug.Log($"[TCP SEND] Processing message - ID: {item.MessageId}, ToAddress: {item.ToAddress}, Port: {item.Port}");
+#endif
                     try
                     {
                         // 送信先が指定されている場合は接続プールから取得または作成
                         SocketTcpClient targetClient;
                         if (!string.IsNullOrEmpty(item.ToAddress) && item.Port.HasValue)
                         {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.Log($"[TCP SEND] Getting connection from pool - Address: {item.ToAddress}, Port: {item.Port}");
+#endif
                             targetClient = await connectionPool.GetOrCreateConnectionAsync(item.ToAddress, item.Port.Value, token);
                             if (targetClient == null)
                             {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+                        UnityEngine.Debug.LogError($"[TCP SEND] Failed to get connection to {item.ToAddress}:{item.Port}");
+#endif
                                 // 接続の取得に失敗した場合
                                 bool ignoreErrors = options is MessagePipeInterprocessTcpExtendedOptions extOptions && extOptions.IgnoreConnectErrors;
                                 if (ignoreErrors)
@@ -278,12 +305,21 @@ namespace MessagePipe.Interprocess.Workers
                         }
                         else
                         {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.Log($"[TCP SEND] Using default client (no specific address/port)");
+#endif
                             // デフォルトの接続を使用
                             targetClient = tcpClient;
                         }
                         
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+                UnityEngine.Debug.Log($"[TCP SEND] Sending data - Length: {item.Data.Length} bytes");
+#endif
                         await targetClient.SendAsync(item.Data, token).ConfigureAwait(false);
                         
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+                UnityEngine.Debug.Log($"[TCP SEND] Send completed successfully - ID: {item.MessageId}");
+#endif
                         // 送信成功
                         item.State = TcpMessageState.Completed;
                         item.CompletionCallback?.Invoke();
@@ -293,6 +329,9 @@ namespace MessagePipe.Interprocess.Workers
                         if (ex is OperationCanceledException) return;
                         if (token.IsCancellationRequested) return;
 
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+                UnityEngine.Debug.LogError($"[TCP SEND] Error sending message - ID: {item.MessageId}, Error: {ex.Message}\n{ex.StackTrace}");
+#endif
                         // エラーコールバックが設定されている場合は呼び出し
                         if (item.ErrorCallback != null)
                         {
@@ -318,16 +357,38 @@ namespace MessagePipe.Interprocess.Workers
 
         public void StartReceiver()
         {
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+    UnityEngine.Debug.Log($"[TCP RECEIVE] StartReceiver called");
+#endif
             if (Interlocked.Increment(ref initializedServer) == 1) // first incr, channel not yet started
             {
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+        UnityEngine.Debug.Log($"[TCP RECEIVE] Initializing server for the first time");
+#endif
                 var s = server.Value; // init
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+        var tcpOptions = options as MessagePipeInterprocessTcpOptions;
+        UnityEngine.Debug.Log($"[TCP RECEIVE] Server initialized - Host: {tcpOptions?.Host}, Port: {tcpOptions?.Port}, HostAsServer: {tcpOptions?.HostAsServer}");
+#endif
                 s.StartAcceptLoopAsync(RunReceiveLoop, cancellationTokenSource.Token);
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+        UnityEngine.Debug.Log($"[TCP RECEIVE] StartAcceptLoopAsync called");
+#endif
             }
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+            else
+            {
+                UnityEngine.Debug.Log($"[TCP RECEIVE] Server already initialized, initializedServer = {initializedServer}");
+            }
+#endif
         }
 
         // Receive from tcp socket and push value to subscribers.
         async void RunReceiveLoop(SocketTcpClient client)
         {
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+    UnityEngine.Debug.Log($"[TCP RECEIVE] RunReceiveLoop started for client: {client.GetHashCode()}");
+#endif
             var token = cancellationTokenSource.Token;
             var buffer = new byte[65536];
             ReadOnlyMemory<byte> readBuffer = Array.Empty<byte>();
@@ -338,8 +399,20 @@ namespace MessagePipe.Interprocess.Workers
                 {
                     if (readBuffer.Length == 0)
                     {
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                UnityEngine.Debug.Log($"[TCP RECEIVE] Waiting to receive data...");
+#endif
                         var readLen = await client.ReceiveAsync(buffer, 0, buffer.Length, token).ConfigureAwait(false);
-                        if (readLen == 0) return; // end of stream(disconnect)
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                UnityEngine.Debug.Log($"[TCP RECEIVE] Received {readLen} bytes");
+#endif
+                        if (readLen == 0)
+                        {
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                    UnityEngine.Debug.Log($"[TCP RECEIVE] End of stream (disconnect)");
+#endif
+                            return; // end of stream(disconnect)
+                        }
                         readBuffer = buffer.AsMemory(0, readLen);
                     }
                     else if (readBuffer.Length < 4) // rare case
@@ -394,6 +467,9 @@ namespace MessagePipe.Interprocess.Workers
                     if (ex is OperationCanceledException) return;
                     if (token.IsCancellationRequested) return;
 
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+            UnityEngine.Debug.LogError($"[TCP RECEIVE] Network error: {ex.Message}\n{ex.StackTrace}");
+#endif
                     // network error, terminate.
                     options.UnhandledErrorHandler("network error, receive loop will terminate." + Environment.NewLine, ex);
                     return;
@@ -401,10 +477,16 @@ namespace MessagePipe.Interprocess.Workers
             PARSE_MESSAGE:
                 try
                 {
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                UnityEngine.Debug.Log($"[TCP RECEIVE] Parsing message, length: {value.Length} bytes");
+#endif
                     var message = MessageBuilder.ReadPubSubMessage(value.ToArray()); // can avoid copy?
                     switch (message.MessageType)
                     {
                         case MessageType.PubSub:
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                        UnityEngine.Debug.Log($"[TCP RECEIVE] Received PubSub message");
+#endif
                             publisher.Publish(message, message, CancellationToken.None);
                             break;
                         case MessageType.RemoteRequest:
@@ -464,12 +546,18 @@ namespace MessagePipe.Interprocess.Workers
                             }
                             break;
                         default:
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                        UnityEngine.Debug.LogWarning($"[TCP RECEIVE] Unknown message type: {message.MessageType}");
+#endif
                             break;
                     }
                 }
                 catch (Exception ex)
                 {
                     if (ex is OperationCanceledException) continue;
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                UnityEngine.Debug.LogError($"[TCP RECEIVE] Error processing message: {ex.Message}\n{ex.StackTrace}");
+#endif
                     options.UnhandledErrorHandler("", ex);
                 }
             }

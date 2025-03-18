@@ -23,11 +23,17 @@ namespace MessagePipe.Interprocess
         {
             try
             {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+        UnityEngine.Debug.Log($"[TCP SEND] PublishAsync START - Key: {key}, Message: {message}, Type: {message.GetType().Name}");
+#endif
                 // メッセージがIToAddressableを実装しているかチェック
                 if (message is IToAddressable addressable)
                 {
                     // GetToAddress()を呼び出してアドレスを取得
                     string toAddress = addressable.GetToAddress();
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+            UnityEngine.Debug.Log($"[TCP SEND] IToAddressable detected - ToAddress: {toAddress}");
+#endif
                     if (!string.IsNullOrEmpty(toAddress))
                     {
                         // アドレスが取得できた場合
@@ -37,6 +43,9 @@ namespace MessagePipe.Interprocess
                         if (message is IToPortable portable)
                         {
                             int toPort = portable.GetPort();
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.Log($"[TCP SEND] IToPortable detected - Port: {toPort}");
+#endif
                             if (toPort > 0)
                             {
                                 port = toPort;
@@ -47,12 +56,18 @@ namespace MessagePipe.Interprocess
                         return PublishToTargetAsync(key, message, toAddress, port, cancellationToken);
                     }
                 }
-                
+
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+        UnityEngine.Debug.Log($"[TCP SEND] Using default publish method (no address specified)");
+#endif
                 // IToAddressableを実装していない、またはアドレスが取得できなかった場合は従来の処理
                 worker.Publish(key, message);
             }
             catch (Exception ex)
             {
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+        UnityEngine.Debug.LogError($"[TCP SEND] Error in PublishAsync: {ex.Message}\n{ex.StackTrace}");
+#endif
                 // 拡張オプションの場合はエラー無視設定を確認
                 bool ignoreErrors = options is MessagePipeInterprocessTcpExtendedOptions extOptions && extOptions.IgnoreSendErrors;
                 if (ignoreErrors)
