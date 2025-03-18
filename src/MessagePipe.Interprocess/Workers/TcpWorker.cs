@@ -485,7 +485,7 @@ namespace MessagePipe.Interprocess.Workers
                     {
                         case MessageType.PubSub:
 #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
-                            UnityEngine.Debug.Log($"[TCP RECEIVE] Received PubSub message"");
+                            UnityEngine.Debug.Log($"[TCP RECEIVE] Received PubSub message");
                             // メッセージの内容をより詳細に表示
                             try {
                                 var keyString = System.Text.Encoding.UTF8.GetString(message.KeyMemory.Span);
