@@ -897,7 +897,7 @@ namespace MessagePipe.Interprocess.Workers
                 try
                 {
                     var reader = new MessagePackReader(keyBytes);
-                    var type = reader.NextMessagePackType();
+                    var type = reader.NextMessagePackType;
                     UnityEngine.Debug.Log($"[TCP DEBUG] MessagePack type: {type}");
                     
                     // 文字列型だった場合は内容も表示
