@@ -98,11 +98,15 @@ namespace MessagePipe.Interprocess
         /// <summary>
         /// 接続を取得または作成
         /// </summary>
-        public async UniTask<SocketTcpClient> GetOrCreateConnectionAsync(string address, int port, CancellationToken cancellationToken = default)
+        public async UniTask<SocketTcpClient> GetOrCreateConnectionAsync(
+            string address, 
+            int port, 
+            CancellationToken cancellationToken = default)
         {
-#if MESSAGEPIPE_TCP_SEND_DEBUG
+            #if MESSAGEPIPE_TCP_SEND_DEBUG
             UnityEngine.Debug.Log($"[TCP POOL] GetOrCreateConnectionAsync - Address: {address}, Port: {port}");
-#endif
+            #endif
+            
             if (_isDisposed)
             {
                 throw new ObjectDisposedException(nameof(TcpConnectionPool));
@@ -113,9 +117,10 @@ namespace MessagePipe.Interprocess
             // 既存の接続を確認
             if (_connections.TryGetValue(key, out var connectionInfo) && connectionInfo.IsValid)
             {
-#if MESSAGEPIPE_TCP_SEND_DEBUG
+                #if MESSAGEPIPE_TCP_SEND_DEBUG
                 UnityEngine.Debug.Log($"[TCP POOL] Using existing connection - Key: {key}");
-#endif
+                #endif
+                
                 connectionInfo.UpdateLastAccessTime();
                 return connectionInfo.Client;
             }
@@ -123,37 +128,54 @@ namespace MessagePipe.Interprocess
             // 新しい接続を作成
             try
             {
-#if MESSAGEPIPE_TCP_SEND_DEBUG
+                #if MESSAGEPIPE_TCP_SEND_DEBUG
                 UnityEngine.Debug.Log($"[TCP POOL] Creating new connection - Address: {address}, Port: {port}");
-#endif
-                // 修正: 新しいConnectWithLocalEndpointメソッドを使用
-                var client = SocketTcpClient.ConnectWithLocalEndpoint(address, port);
+                #endif
                 
-#if MESSAGEPIPE_TCP_SEND_DEBUG
+                // 接続のタイムアウトを設定
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                
+                // タイムアウト値を設定
+                int timeoutMs = 5000; // デフォルト5秒
+                if (_options is MessagePipeInterprocessTcpExtendedOptions extOptions)
+                {
+                    timeoutMs = extOptions.ConnectionTimeoutMs;
+                }
+                timeoutCts.CancelAfter(timeoutMs);
+                
+                // 接続試行
+                var client = SocketTcpClient.Connect(address, port);
+                
+                #if MESSAGEPIPE_TCP_SEND_DEBUG
                 UnityEngine.Debug.Log($"[TCP POOL] Connection created successfully - Key: {key}");
-#endif
+                #endif
+                
                 var newConnectionInfo = new TcpConnectionInfo(address, port, client);
                 _connections[key] = newConnectionInfo;
                 return client;
             }
-            catch (SocketException ex)
+            catch (Exception ex)
             {
-#if MESSAGEPIPE_TCP_SEND_DEBUG
+                #if MESSAGEPIPE_TCP_SEND_DEBUG
                 UnityEngine.Debug.LogError($"[TCP POOL] Connection failed - Address: {address}, Port: {port}, Error: {ex.Message}\n{ex.StackTrace}");
-#endif
+                #endif
+                
                 // 接続エラーの処理
-                var tcpOptions = _options as MessagePipeInterprocessTcpOptions;
-                bool ignoreErrors = tcpOptions != null && 
-                                   (tcpOptions is MessagePipeInterprocessTcpExtendedOptions extendedOptions && 
-                                    extendedOptions.IgnoreConnectErrors);
-
+                var ignoreErrors = false;
+                if (_options is MessagePipeInterprocessTcpExtendedOptions extOptions)
+                {
+                    ignoreErrors = extOptions.IgnoreConnectErrors;
+                }
+                
                 if (ignoreErrors)
                 {
                     _options.UnhandledErrorHandler?.Invoke($"Failed to connect to {address}:{port}, but continuing due to IgnoreConnectErrors option.", ex);
                     return null;
                 }
                 
-                throw new InvalidOperationException($"Failed to connect to {address}:{port}. This may be due to network issues or the target server not being available.", ex);
+                throw new InvalidOperationException(
+                    $"Failed to connect to {address}:{port}. This may be due to network issues or the target server not being available.", 
+                    ex);
             }
         }
 

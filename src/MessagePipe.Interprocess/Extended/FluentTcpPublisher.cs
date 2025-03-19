@@ -3,6 +3,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using MessagePipe.Interprocess.Workers;
+using MessagePipe.Interprocess.Internal;
+
 
 namespace MessagePipe.Interprocess
 {
@@ -122,11 +124,16 @@ namespace MessagePipe.Interprocess
         /// <summary>
         /// メッセージを非同期で送信
         /// </summary>
+        [Preserve]
         public async UniTask PublishAsync<TKey, TMessage>(TKey key, TMessage message, CancellationToken cancellationToken = default)
         {
             // 送信先アドレスの取得
             string targetAddress = _targetAddress;
             int targetPort = _targetPort ?? (_options as MessagePipeInterprocessTcpOptions)?.Port ?? 0;
+            
+            #if MESSAGEPIPE_TCP_SEND_DEBUG
+            UnityEngine.Debug.Log($"[TCP FLUENT] PublishAsync - Key: {key}, Message: {message}, Initial Target: {targetAddress}:{targetPort}");
+            #endif
             
             // メッセージがIToAddressableを実装している場合は、そのアドレスを使用
             if (message is IToAddressable addressable)
@@ -134,6 +141,9 @@ namespace MessagePipe.Interprocess
                 string messageAddress = addressable.GetToAddress();
                 if (!string.IsNullOrEmpty(messageAddress))
                 {
+                    #if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.Log($"[TCP FLUENT] Using address from IToAddressable: {messageAddress}");
+                    #endif
                     targetAddress = messageAddress;
                 }
             }
@@ -144,6 +154,9 @@ namespace MessagePipe.Interprocess
                 int messagePort = portable.GetPort();
                 if (messagePort > 0)
                 {
+                    #if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.Log($"[TCP FLUENT] Using port from IToPortable: {messagePort}");
+                    #endif
                     targetPort = messagePort;
                 }
             }
@@ -151,13 +164,23 @@ namespace MessagePipe.Interprocess
             // 送信先アドレスとポートの検証
             if (string.IsNullOrEmpty(targetAddress))
             {
+                #if MESSAGEPIPE_TCP_SEND_DEBUG
+                UnityEngine.Debug.LogError($"[TCP FLUENT] Target address is not specified");
+                #endif
                 throw new InvalidOperationException("Target address is not specified.");
             }
             
             if (targetPort <= 0)
             {
-                throw new InvalidOperationException("Target port is not specified or invalid.");
+                #if MESSAGEPIPE_TCP_SEND_DEBUG
+                UnityEngine.Debug.LogError($"[TCP FLUENT] Target port is not specified or invalid: {targetPort}");
+                #endif
+                throw new InvalidOperationException($"Target port is not specified or invalid: {targetPort}");
             }
+            
+            #if MESSAGEPIPE_TCP_SEND_DEBUG
+            UnityEngine.Debug.Log($"[TCP FLUENT] Final target: {targetAddress}:{targetPort}");
+            #endif
             
             // メッセージコンテナの作成
             var messageData = _worker.SerializeMessage(key, message);
@@ -195,11 +218,13 @@ namespace MessagePipe.Interprocess
         /// <summary>
         /// リトライ機能付きの送信処理
         /// </summary>
+        [Preserve]
         private async UniTask SendWithRetryAsync(TcpMessageContainer container, CancellationToken cancellationToken)
         {
-#if MESSAGEPIPE_TCP_SEND_DEBUG
-    UnityEngine.Debug.Log($"[TCP FLUENT] SendWithRetryAsync - ID: {container.MessageId}, ToAddress: {container.ToAddress}, Port: {container.Port}");
-#endif
+            #if MESSAGEPIPE_TCP_SEND_DEBUG
+            UnityEngine.Debug.Log($"[TCP FLUENT] SendWithRetryAsync - ID: {container.MessageId}, ToAddress: {container.ToAddress}, Port: {container.Port}");
+            #endif
+            
             int attempts = 0;
             Exception lastException = null;
             
@@ -207,17 +232,18 @@ namespace MessagePipe.Interprocess
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
-#if MESSAGEPIPE_TCP_SEND_DEBUG
-            UnityEngine.Debug.LogWarning($"[TCP FLUENT] Operation canceled");
-#endif
+                    #if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.LogWarning($"[TCP FLUENT] Operation canceled");
+                    #endif
                     throw new OperationCanceledException("Operation was canceled.");
                 }
                 
                 try
                 {
-#if MESSAGEPIPE_TCP_SEND_DEBUG
-            UnityEngine.Debug.Log($"[TCP FLUENT] Attempt {attempts+1}/{container.RetryCount+1} - ID: {container.MessageId}");
-#endif
+                    #if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.Log($"[TCP FLUENT] Attempt {attempts+1}/{container.RetryCount+1} - ID: {container.MessageId}");
+                    #endif
+                    
                     using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     cts.CancelAfter(container.Timeout);
                     
@@ -229,21 +255,23 @@ namespace MessagePipe.Interprocess
                     
                     if (client == null)
                     {
-#if MESSAGEPIPE_TCP_SEND_DEBUG
-                UnityEngine.Debug.LogError($"[TCP FLUENT] Failed to create connection to {container.ToAddress}:{container.Port}");
-#endif
+                        #if MESSAGEPIPE_TCP_SEND_DEBUG
+                        UnityEngine.Debug.LogError($"[TCP FLUENT] Failed to create connection to {container.ToAddress}:{container.Port}");
+                        #endif
                         throw new InvalidOperationException($"Failed to create connection to {container.ToAddress}:{container.Port}");
                     }
                     
-#if MESSAGEPIPE_TCP_SEND_DEBUG
-            UnityEngine.Debug.Log($"[TCP FLUENT] Sending data - Length: {container.Data.Length} bytes");
-#endif
+                    #if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.Log($"[TCP FLUENT] Sending data - Length: {container.Data.Length} bytes");
+                    #endif
+                    
                     // メッセージを送信
                     await client.SendAsync(container.Data, cts.Token);
                     
-#if MESSAGEPIPE_TCP_SEND_DEBUG
-            UnityEngine.Debug.Log($"[TCP FLUENT] Send completed successfully - ID: {container.MessageId}");
-#endif
+                    #if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.Log($"[TCP FLUENT] Send completed successfully - ID: {container.MessageId}");
+                    #endif
+                    
                     // 送信成功
                     container.State = TcpMessageState.Completed;
                     container.CompletionCallback?.Invoke();
@@ -251,17 +279,18 @@ namespace MessagePipe.Interprocess
                 }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                 {
-#if MESSAGEPIPE_TCP_SEND_DEBUG
-            UnityEngine.Debug.LogWarning($"[TCP FLUENT] Connection timed out - ID: {container.MessageId}");
-#endif
+                    #if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.LogWarning($"[TCP FLUENT] Connection timed out - ID: {container.MessageId}");
+                    #endif
+                    
                     // タイムアウト
                     lastException = new TimeoutException($"Connection to {container.ToAddress}:{container.Port} timed out");
                 }
                 catch (Exception ex)
                 {
-#if MESSAGEPIPE_TCP_SEND_DEBUG
-            UnityEngine.Debug.LogError($"[TCP FLUENT] Error sending message - ID: {container.MessageId}, Error: {ex.Message}\n{ex.StackTrace}");
-#endif
+                    #if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.LogError($"[TCP FLUENT] Error sending message - ID: {container.MessageId}, Error: {ex.Message}\n{ex.StackTrace}");
+                    #endif
                     lastException = ex;
                 }
                 
@@ -269,11 +298,12 @@ namespace MessagePipe.Interprocess
                 container.CurrentRetryCount = attempts;
                 
                 // 最大リトライ回数に達していなければ待機して再試行
-                if (attempts < container.RetryCount)
+                if (attempts <= container.RetryCount)
                 {
-#if MESSAGEPIPE_TCP_SEND_DEBUG
-            UnityEngine.Debug.Log($"[TCP FLUENT] Retrying after delay - ID: {container.MessageId}, Attempt: {attempts}/{container.RetryCount}");
-#endif
+                    #if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.Log($"[TCP FLUENT] Retrying after delay - ID: {container.MessageId}, Attempt: {attempts}/{container.RetryCount}");
+                    #endif
+                    
                     container.State = TcpMessageState.Retrying;
                     await UniTask.Delay(_retryInterval, cancellationToken: cancellationToken);
                 }
@@ -281,9 +311,10 @@ namespace MessagePipe.Interprocess
             
             // すべての試行が失敗
             container.State = TcpMessageState.Failed;
-#if MESSAGEPIPE_TCP_SEND_DEBUG
-    UnityEngine.Debug.LogError($"[TCP FLUENT] All retry attempts failed - ID: {container.MessageId}, Attempts: {attempts}/{container.RetryCount}");
-#endif
+            
+            #if MESSAGEPIPE_TCP_SEND_DEBUG
+            UnityEngine.Debug.LogError($"[TCP FLUENT] All retry attempts failed - ID: {container.MessageId}, Attempts: {attempts}/{container.RetryCount}");
+            #endif
             
             // エラーコールバックを呼び出し
             if (container.ErrorCallback != null)
@@ -303,14 +334,16 @@ namespace MessagePipe.Interprocess
                 else
                 {
                     // エラーを無視する場合はログに記録
-#if MESSAGEPIPE_TCP_SEND_DEBUG
-            UnityEngine.Debug.LogWarning($"[TCP FLUENT] Ignoring send errors due to IgnoreSendErrors option - ID: {container.MessageId}");
-#endif
+                    #if MESSAGEPIPE_TCP_SEND_DEBUG
+                    UnityEngine.Debug.LogWarning($"[TCP FLUENT] Ignoring send errors due to IgnoreSendErrors option - ID: {container.MessageId}");
+                    #endif
+                    
                     _options.UnhandledErrorHandler?.Invoke(
                         $"Failed to publish message to {container.ToAddress}:{container.Port} after {container.RetryCount} attempts, but continuing due to IgnoreSendErrors option.",
                         lastException);
                 }
             }
         }
+
     }
 }

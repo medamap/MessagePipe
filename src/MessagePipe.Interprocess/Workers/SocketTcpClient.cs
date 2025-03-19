@@ -55,20 +55,72 @@ namespace MessagePipe.Interprocess.Workers
         }
 #endif
 
+        // SocketTcpServer.cs - StartAcceptLoopAsync メソッドの修正
+        [Preserve]
         public async void StartAcceptLoopAsync(Action<SocketTcpClient> onAccept, CancellationToken cancellationToken)
         {
+            #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+            UnityEngine.Debug.Log($"[TCP SERVER] StartAcceptLoopAsync called");
+            #endif
+            
             while (!cancellationToken.IsCancellationRequested)
             {
                 Socket remote = default;
                 try
                 {
+                    #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                    UnityEngine.Debug.Log($"[TCP SERVER] Waiting for client connection...");
+                    #endif
+                    
                     remote = await socket.AcceptAsync();
+                    
+                    #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                    UnityEngine.Debug.Log($"[TCP SERVER] Client connected: {remote.RemoteEndPoint}");
+                    #endif
                 }
-                catch // (ObjectDisposedException)
+                catch (Exception ex)
                 {
-                    return;
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                        UnityEngine.Debug.Log($"[TCP SERVER] Accept loop canceled");
+                        #endif
+                        return;
+                    }
+                    
+                    if (ex is ObjectDisposedException)
+                    {
+                        #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                        UnityEngine.Debug.Log($"[TCP SERVER] Socket was disposed, ending accept loop");
+                        #endif
+                        return;
+                    }
+                    
+                    #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                    UnityEngine.Debug.LogError($"[TCP SERVER] Error accepting client: {ex.Message}\n{ex.StackTrace}");
+                    #endif
+                    
+                    // 短い遅延を入れて再試行（サーバーが一時的に応答しない場合への対応）
+                    await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
+                    continue;
                 }
-                onAccept(new SocketTcpClient(remote));
+                
+                if (remote != null)
+                {
+                    try
+                    {
+                        // 接続を受け入れコールバックを呼び出し
+                        onAccept(new SocketTcpClient(remote));
+                    }
+                    catch (Exception ex)
+                    {
+                        #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                        UnityEngine.Debug.LogError($"[TCP SERVER] Error in onAccept callback: {ex.Message}\n{ex.StackTrace}");
+                        #endif
+                        
+                        // コールバックでエラーが発生しても接続ループは継続
+                    }
+                }
             }
         }
 
@@ -92,19 +144,34 @@ namespace MessagePipe.Interprocess.Workers
             this.socket = socket;
         }
 
+// SocketTcpClient.cs の Connect メソッド修正
+        [Preserve]
         public static SocketTcpClient Connect(string host, int port)
         {
             try
             {
-                // 既存のメソッドを使用
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+                UnityEngine.Debug.Log($"[TCP CLIENT] Connecting to {host}:{port}");
+#endif
+        
+                // IPアドレスを解析
                 var ip = new IPEndPoint(IPAddress.Parse(host), port);
                 var client = new SocketTcpClient(ip.AddressFamily, ProtocolType.Tcp);
+        
+                // Connect呼び出しでブロック
                 client.socket.Connect(ip);
+        
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+                UnityEngine.Debug.Log($"[TCP CLIENT] Connected successfully to {host}:{port}");
+#endif
+        
                 return client;
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogError($"[TCP DEBUG] Connect error: {ex.Message}\n{ex.StackTrace}");
+#if MESSAGEPIPE_TCP_SEND_DEBUG
+                UnityEngine.Debug.LogError($"[TCP CLIENT] Connect error: {ex.Message}\n{ex.StackTrace}");
+#endif
                 throw;
             }
         }

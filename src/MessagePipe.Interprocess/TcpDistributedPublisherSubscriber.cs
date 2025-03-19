@@ -124,16 +124,30 @@ namespace MessagePipe.Interprocess
         readonly FilterAttachedAsyncMessageHandlerFactory asyncHandlerFactory;
 
         [Preserve]
-        public TcpDistributedSubscriber(TcpWorker worker, MessagePipeInterprocessTcpOptions options, IAsyncSubscriber<IInterprocessKey, IInterprocessValue> subscriberCore, FilterAttachedMessageHandlerFactory syncHandlerFactory, FilterAttachedAsyncMessageHandlerFactory asyncHandlerFactory)
+        public TcpDistributedSubscriber(TcpWorker worker, MessagePipeInterprocessTcpOptions options,
+            IAsyncSubscriber<IInterprocessKey, IInterprocessValue> subscriberCore,
+            FilterAttachedMessageHandlerFactory syncHandlerFactory,
+            FilterAttachedAsyncMessageHandlerFactory asyncHandlerFactory)
         {
             this.options = options;
             this.subscriberCore = subscriberCore;
             this.syncHandlerFactory = syncHandlerFactory;
             this.asyncHandlerFactory = asyncHandlerFactory;
 
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+            UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Creating TcpDistributedSubscriber");
+            UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Options type: {options.GetType().Name}");
+            UnityEngine.Debug.Log($"[TCP SUBSCRIBE] MessagePack resolver: {options.MessagePackSerializerOptions.Resolver.GetType().Name}");
+#endif
+
             try
             {
+                // 受信処理を開始
                 worker.StartReceiver();
+                
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Receiver started successfully");
+#endif
             }
             catch (Exception ex)
             {
@@ -146,6 +160,9 @@ namespace MessagePipe.Interprocess
                 else
                 {
                     // それ以外は例外を再スロー
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+                    UnityEngine.Debug.LogError($"[TCP SUBSCRIBE] Failed to start receiver: {ex.Message}");
+#endif
                     throw;
                 }
             }
@@ -211,28 +228,32 @@ namespace MessagePipe.Interprocess
             return SubscribeCore(key, transform);
         }
 
-        UniTask<IUniTaskAsyncDisposable> SubscribeCore(TKey key, IAsyncMessageHandler<IInterprocessValue> handler)
+        [Preserve]
+        private UniTask<IUniTaskAsyncDisposable> SubscribeCore(TKey key, IAsyncMessageHandler<IInterprocessValue> handler)
         {
+#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
+    UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Subscribing to key: {key}");
+#endif
+    
             var byteKey = MessageBuilder.CreateKey(key, options.MessagePackSerializerOptions);
+    
 #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
-            UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Subscribing to key: {key}");
+    UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Subscribing with key bytes: {BitConverter.ToString(byteKey.KeyMemory.ToArray())}");
+    UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Key hash: {byteKey.GetHashCode()}");
+    
+    // シリアライザオプションの詳細を表示
+    var resolverType = options.MessagePackSerializerOptions.Resolver.GetType();
+    UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Using resolver: {resolverType.FullName}");
 #endif
-            // キーのバイト表現を確認
-#if MESSAGEPIPE_TCP_RECEIVE_DEBUG
-            UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Subscribing with key: {key}");
-            UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Key bytes: {BitConverter.ToString(byteKey.KeyMemory.ToArray())}");
-            try {
-                var keyString = System.Text.Encoding.UTF8.GetString(byteKey.KeyMemory.Span);
-                UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Key as string: {keyString}");
-            } catch {
-                UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Could not decode key as string");
-            }
-#endif
+    
             var d = subscriberCore.Subscribe(byteKey, handler);
+    
 #if MESSAGEPIPE_TCP_RECEIVE_DEBUG
-            UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Subscription completed for key: {key}");
+    UnityEngine.Debug.Log($"[TCP SUBSCRIBE] Subscription completed for key: {key}");
 #endif
+    
             return new UniTask<IUniTaskAsyncDisposable>(new AsyncDisposableBridge(d));
         }
+
     }
 }

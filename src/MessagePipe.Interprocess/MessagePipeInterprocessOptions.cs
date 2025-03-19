@@ -12,8 +12,11 @@ namespace MessagePipe.Interprocess
 
         public MessagePipeInterprocessOptions()
         {
-            this.MessagePackSerializerOptions = ContractlessStandardResolver.Options;
+            // ContractlessStandardResolverのオプションを直接使用
+            // 注: MessagePackSerializerOptions の直接コンストラクタ呼び出しを避ける
+            this.MessagePackSerializerOptions = MessagePack.Resolvers.ContractlessStandardResolver.Options;
             this.InstanceLifetime = InstanceLifetime.Scoped;
+    
 #if !UNITY_2018_3_OR_NEWER
             this.UnhandledErrorHandler = (msg, x) => Console.WriteLine(msg + x);
 #else
