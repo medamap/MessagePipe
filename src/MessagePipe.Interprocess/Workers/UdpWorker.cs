@@ -18,9 +18,9 @@ namespace MessagePipe.Interprocess.Workers
         public int? Port { get; set; } // ポート番号を追加
     }
 
-    /// ＜summary＞
+    /// <summary>
     /// ワーカー登録用のフック
-    /// ＜/summary＞
+    /// </summary>
     [Preserve]
     public class WorkerRegistrationHook
     {
@@ -39,9 +39,9 @@ namespace MessagePipe.Interprocess.Workers
             {
                 _options.RegisterWorker(worker);
             
-#if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log("[WorkerRegistrationHook] UdpWorker registered for cleanup");
-#endif
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.Log("[WorkerRegistrationHook] UdpWorker registered for cleanup");
+                #endif
             }
         }
     }
@@ -97,7 +97,7 @@ namespace MessagePipe.Interprocess.Workers
                 var udpOptions = options as MessagePipeInterprocessUdpOptions;
                 
                 #if MESSAGEPIPE_UDP_DEBUG
-                UnityEngine.Debug.Log("[UdpWorker] Creating UDP client to " + udpOptions.Host + ":" + udpOptions.Port 
+                UnityEngine.Debug.Log("[UdpWorker] Creating UDP client to " + udpOptions.Host + ": " + udpOptions.Port 
                     + (string.IsNullOrEmpty(udpOptions.SubnetMask) ? "" : ", SubnetMask: " + udpOptions.SubnetMask)
                     + (string.IsNullOrEmpty(udpOptions.NetworkAddress) ? "" : ", NetworkAddress: " + udpOptions.NetworkAddress));
                 #endif
@@ -191,8 +191,10 @@ namespace MessagePipe.Interprocess.Workers
         public void Publish<TKey, TMessage>(TKey key, TMessage message, string toAddress)
         {
             #if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log("[UdpWorker] Publishing message of type " + typeof(TMessage).Name + " with key type " + typeof(TKey).Name 
-                + (string.IsNullOrEmpty(toAddress) ? " to default address" : " to address: " + toAddress));
+            LogThrottler.ThrottledLog(
+                "UdpWorker.Publish",
+                count => UnityEngine.Debug.Log("[UdpWorker] Publishing messages (" + count + " times) of type " + typeof(TMessage).Name),
+                100, 2000);
             #endif
             
             if (Interlocked.Increment(ref initializedClient) == 1) // first incr, channel not yet started
@@ -249,13 +251,19 @@ namespace MessagePipe.Interprocess.Workers
             var buffer = MessageBuilder.BuildPubSubMessage(key, message, options.MessagePackSerializerOptions);
             
             #if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log("[UdpWorker] Built message buffer with size: " + buffer.Length + " bytes");
+            LogThrottler.ThrottledLog(
+                "UdpWorker.MessageBuffer",
+                count => UnityEngine.Debug.Log("[UdpWorker] Built message buffers (" + count + " times) with avg size: " + buffer.Length + " bytes"),
+                200, 5000);
             #endif
             
             channel.Writer.TryWrite(new UdpMessageContainer { Data = buffer, ToAddress = toAddress });
             
             #if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log("[UdpWorker] Message queued for sending");
+            LogThrottler.ThrottledLog(
+                "UdpWorker.MessageQueued",
+                count => UnityEngine.Debug.Log("[UdpWorker] Messages queued for sending (" + count + " messages)"),
+                200, 5000);
             #endif
         }
 
@@ -265,8 +273,10 @@ namespace MessagePipe.Interprocess.Workers
         public void PublishToTarget<TKey, TMessage>(TKey key, TMessage message, string targetAddress, int targetPort)
         {
             #if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log("[UdpWorker] Publishing message of type " + typeof(TMessage).Name + " with key type " + typeof(TKey).Name 
-                + " to specific target: " + targetAddress + ":" + targetPort);
+            LogThrottler.ThrottledLog(
+                "UdpWorker.PublishToTarget",
+                count => UnityEngine.Debug.Log("[UdpWorker] Publishing targeted messages (" + count + " times) to " + targetAddress + ":" + targetPort),
+                100, 2000);
             #endif
             
             if (Interlocked.Increment(ref initializedClient) == 1) // first incr, channel not yet started
@@ -323,8 +333,10 @@ namespace MessagePipe.Interprocess.Workers
             var buffer = MessageBuilder.BuildPubSubMessage(key, message, options.MessagePackSerializerOptions);
             
             #if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log("[UdpWorker] Built targeted message buffer with size: " + buffer.Length + " bytes, target: " 
-                + targetAddress + ":" + targetPort);
+            LogThrottler.ThrottledLog(
+                "UdpWorker.TargetedMessageBuffer",
+                count => UnityEngine.Debug.Log("[UdpWorker] Built targeted message buffers (" + count + " times) with avg size: " + buffer.Length + " bytes"),
+                200, 5000);
             #endif
             
             channel.Writer.TryWrite(new UdpMessageContainer { 
@@ -334,7 +346,10 @@ namespace MessagePipe.Interprocess.Workers
             });
             
             #if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log("[UdpWorker] Targeted message queued for sending");
+            LogThrottler.ThrottledLog(
+                "UdpWorker.TargetedMessageQueued",
+                count => UnityEngine.Debug.Log("[UdpWorker] Targeted messages queued (" + count + " messages)"),
+                200, 5000);
             #endif
         }
 
@@ -376,7 +391,11 @@ namespace MessagePipe.Interprocess.Workers
                         var sendStartTime = DateTime.UtcNow;
                         var sendType = !string.IsNullOrEmpty(item.ToAddress) ? 
                             (item.Port.HasValue ? "targeted with specific port" : "targeted") : "default";
-                        UnityEngine.Debug.Log("[UdpWorker] Sending " + sendType + " message, buffer size: " + item.Data.Length + " bytes");
+                            
+                        LogThrottler.ThrottledLog(
+                            "UdpWorker.SendingMessage" + sendType,
+                            count => UnityEngine.Debug.Log("[UdpWorker] Sending " + sendType + " messages (" + count + " times)"),
+                            100, 2000);
                         #endif
                         
                         // 送信先アドレスとポートが指定されている場合
@@ -385,8 +404,10 @@ namespace MessagePipe.Interprocess.Workers
                             await udpClient.SendToAsync(item.Data, item.ToAddress, item.Port.Value, token).ConfigureAwait(false);
                             
                             #if MESSAGEPIPE_UDP_DEBUG
-                            UnityEngine.Debug.Log("[UdpWorker] Sent message to specific target: " + item.ToAddress + ":" + item.Port.Value 
-                                + ", took: " + (DateTime.UtcNow - sendStartTime).TotalMilliseconds + "ms");
+                            LogThrottler.ThrottledLog(
+                                "UdpWorker.SentToSpecificTarget" + item.ToAddress + ":" + item.Port.Value,
+                                count => UnityEngine.Debug.Log("[UdpWorker] Sent " + count + " messages to specific target: " + item.ToAddress + ":" + item.Port.Value),
+                                100, 5000);
                             #endif
                         }
                         // 送信先アドレスのみ指定されている場合
@@ -395,8 +416,10 @@ namespace MessagePipe.Interprocess.Workers
                             await udpClient.SendToAsync(item.Data, item.ToAddress, token).ConfigureAwait(false);
                             
                             #if MESSAGEPIPE_UDP_DEBUG
-                            UnityEngine.Debug.Log("[UdpWorker] Sent message to address: " + item.ToAddress 
-                                + ", took: " + (DateTime.UtcNow - sendStartTime).TotalMilliseconds + "ms");
+                            LogThrottler.ThrottledLog(
+                                "UdpWorker.SentToAddress" + item.ToAddress,
+                                count => UnityEngine.Debug.Log("[UdpWorker] Sent " + count + " messages to address: " + item.ToAddress),
+                                100, 5000);
                             #endif
                         }
                         // デフォルト送信先を使用
@@ -405,8 +428,10 @@ namespace MessagePipe.Interprocess.Workers
                             await udpClient.SendAsync(item.Data, token).ConfigureAwait(false);
                             
                             #if MESSAGEPIPE_UDP_DEBUG
-                            UnityEngine.Debug.Log("[UdpWorker] Sent message to default endpoint, took: " 
-                                + (DateTime.UtcNow - sendStartTime).TotalMilliseconds + "ms");
+                            LogThrottler.ThrottledLog(
+                                "UdpWorker.SentToDefault",
+                                count => UnityEngine.Debug.Log("[UdpWorker] Sent " + count + " messages to default endpoint"),
+                                100, 5000);
                             #endif
                         }
                         
@@ -519,7 +544,10 @@ namespace MessagePipe.Interprocess.Workers
             else
             {
                 #if MESSAGEPIPE_UDP_DEBUG
-                UnityEngine.Debug.Log("[UdpWorker] Receiver already started");
+                LogThrottler.ThrottledLog(
+                    "UdpWorker.ReceiverAlreadyStarted",
+                    count => UnityEngine.Debug.Log("[UdpWorker] Receiver already started (called " + count + " times)"),
+                    10, 10000);
                 #endif
             }
         }
@@ -550,7 +578,7 @@ namespace MessagePipe.Interprocess.Workers
             #if MESSAGEPIPE_UDP_DEBUG
             UnityEngine.Debug.Log("[UdpWorker] Receive loop started successfully");
             #endif
-            
+
             while (!token.IsCancellationRequested)
             {
                 ReadOnlyMemory<byte> value;
@@ -558,6 +586,10 @@ namespace MessagePipe.Interprocess.Workers
                 {
                     #if MESSAGEPIPE_UDP_DEBUG
                     var receiveStartTime = DateTime.UtcNow;
+                    LogThrottler.ThrottledLog(
+                        "UdpWorker.WaitingForPacket",
+                        count => UnityEngine.Debug.Log("[UdpWorker] Waiting for packets (" + count + " times)"),
+                        200, 5000);
                     #endif
                     
                     value = await udpServer.ReceiveAsync(token).ConfigureAwait(false);
@@ -565,15 +597,20 @@ namespace MessagePipe.Interprocess.Workers
                     if (value.Length == 0)
                     {
                         #if MESSAGEPIPE_UDP_DEBUG
-                        UnityEngine.Debug.Log("[UdpWorker] Received empty packet, ignoring");
+                        LogThrottler.ThrottledLog(
+                            "UdpWorker.EmptyPacket",
+                            count => UnityEngine.Debug.Log("[UdpWorker] Received empty packets (" + count + " times), ignoring"),
+                            100, 10000);
                         #endif
                         
                         continue; // ゼロ長パケットは無視
                     }
                     
                     #if MESSAGEPIPE_UDP_DEBUG
-                    UnityEngine.Debug.Log("[UdpWorker] Received packet with size: " + value.Length + " bytes, took: " 
-                        + (DateTime.UtcNow - receiveStartTime).TotalMilliseconds + "ms");
+                    LogThrottler.ThrottledLog(
+                        "UdpWorker.PacketReceived" + value.Length,
+                        count => UnityEngine.Debug.Log("[UdpWorker] Received " + count + " packets with avg size: " + value.Length + " bytes"),
+                        100, 2000);
                     #endif
                     
                     var len = MessageBuilder.FetchMessageLength(value.Span);
@@ -588,7 +625,10 @@ namespace MessagePipe.Interprocess.Workers
                     value = value.Slice(4);
                     
                     #if MESSAGEPIPE_UDP_DEBUG
-                    UnityEngine.Debug.Log("[UdpWorker] Message extracted, payload size: " + value.Length + " bytes");
+                    LogThrottler.ThrottledLog(
+                        "UdpWorker.MessageExtracted",
+                        count => UnityEngine.Debug.Log("[UdpWorker] Message payload extracted (" + count + " times)"),
+                        200, 5000);
                     #endif
                 }
                 catch (Exception ex)
@@ -621,8 +661,11 @@ namespace MessagePipe.Interprocess.Workers
                     var message = MessageBuilder.ReadPubSubMessage(value.ToArray());
                     
                     #if MESSAGEPIPE_UDP_DEBUG
-                    UnityEngine.Debug.Log("[UdpWorker] Message parsed with type: " + message.MessageType + ", key length: " 
-                        + message.KeyMemory.Length + ", value length: " + message.ValueMemory.Length);
+                    LogThrottler.ThrottledLog(
+                        "UdpWorker.MessageParsed",
+                        count => UnityEngine.Debug.Log("[UdpWorker] Parsed " + count + " messages, avg key length: " + 
+                            message.KeyMemory.Length + ", avg value length: " + message.ValueMemory.Length),
+                        100, 2000);
                     #endif
                     
                     publisher.Publish(message, message, CancellationToken.None);
@@ -630,9 +673,11 @@ namespace MessagePipe.Interprocess.Workers
                     messageCount++;
                     
                     #if MESSAGEPIPE_UDP_DEBUG
-                    UnityEngine.Debug.Log("[UdpWorker] Message published to subscribers, took: " 
-                        + (DateTime.UtcNow - processStartTime).TotalMilliseconds + "ms");
-                        
+                    LogThrottler.ThrottledLog(
+                        "UdpWorker.MessagePublished",
+                        count => UnityEngine.Debug.Log("[UdpWorker] Published " + count + " messages to subscribers"),
+                        100, 2000);
+                    
                     if (messageCount % 100 == 0)
                     {
                         UnityEngine.Debug.Log("[UdpWorker] Receive statistics - Messages received: " + messageCount + ", Errors: " + errorCount);
@@ -667,57 +712,57 @@ namespace MessagePipe.Interprocess.Workers
 
         public void Dispose()
         {
-            #if MESSAGEPIPE_UDP_DEBUG
+#if MESSAGEPIPE_UDP_DEBUG
             UnityEngine.Debug.Log("[UdpWorker] Disposing resources");
-            #endif
+#endif
             
             channel.Writer.TryComplete();
             
-            #if MESSAGEPIPE_UDP_DEBUG
+#if MESSAGEPIPE_UDP_DEBUG
             UnityEngine.Debug.Log("[UdpWorker] Channel writer completed");
-            #endif
+#endif
 
             cancellationTokenSource.Cancel();
             
-            #if MESSAGEPIPE_UDP_DEBUG
+#if MESSAGEPIPE_UDP_DEBUG
             UnityEngine.Debug.Log("[UdpWorker] Cancellation requested");
-            #endif
+#endif
             
             cancellationTokenSource.Dispose();
             
-            #if MESSAGEPIPE_UDP_DEBUG
+#if MESSAGEPIPE_UDP_DEBUG
             UnityEngine.Debug.Log("[UdpWorker] CancellationTokenSource disposed");
-            #endif
+#endif
 
             if (server.IsValueCreated)
             {
-                #if MESSAGEPIPE_UDP_DEBUG
+#if MESSAGEPIPE_UDP_DEBUG
                 UnityEngine.Debug.Log("[UdpWorker] Disposing server");
-                #endif
+#endif
                 
                 server.Value.Dispose();
                 
-                #if MESSAGEPIPE_UDP_DEBUG
+#if MESSAGEPIPE_UDP_DEBUG
                 UnityEngine.Debug.Log("[UdpWorker] Server disposed");
-                #endif
+#endif
             }
 
             if (client.IsValueCreated)
             {
-                #if MESSAGEPIPE_UDP_DEBUG
+#if MESSAGEPIPE_UDP_DEBUG
                 UnityEngine.Debug.Log("[UdpWorker] Disposing client");
-                #endif
+#endif
                 
                 client.Value.Dispose();
                 
-                #if MESSAGEPIPE_UDP_DEBUG
+#if MESSAGEPIPE_UDP_DEBUG
                 UnityEngine.Debug.Log("[UdpWorker] Client disposed");
-                #endif
+#endif
             }
             
-            #if MESSAGEPIPE_UDP_DEBUG
+#if MESSAGEPIPE_UDP_DEBUG
             UnityEngine.Debug.Log("[UdpWorker] Dispose completed");
-            #endif
+#endif
         }
     }
 }
