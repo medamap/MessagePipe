@@ -524,7 +524,7 @@ namespace MessagePipe.Interprocess.Workers
             
             try
             {
-                socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, endpoint, ar =  
+                socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, endpoint, ar =>
                 {
                     try 
                     { 
