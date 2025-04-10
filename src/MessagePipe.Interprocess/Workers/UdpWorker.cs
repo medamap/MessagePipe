@@ -40,7 +40,7 @@ namespace MessagePipe.Interprocess.Workers
                 _options.RegisterWorker(worker);
             
 #if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log(＂[WorkerRegistrationHook] UdpWorker registered for cleanup＂);
+            UnityEngine.Debug.Log("[WorkerRegistrationHook] UdpWorker registered for cleanup");
 #endif
             }
         }
