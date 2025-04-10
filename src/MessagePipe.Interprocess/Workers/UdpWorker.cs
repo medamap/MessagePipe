@@ -736,8 +736,17 @@ namespace MessagePipe.Interprocess.Workers
             #endif
         }
 
+        // 既にDisposeされたかを追跡するフラグを追加
+        private bool _disposed = false;
         public void Dispose()
         {
+            // 既にDisposeされていたら何もしない
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+            
 #if MESSAGEPIPE_UDP_DEBUG
             UnityEngine.Debug.Log("[UdpWorker] Disposing resources");
 #endif
@@ -748,42 +757,71 @@ namespace MessagePipe.Interprocess.Workers
             UnityEngine.Debug.Log("[UdpWorker] Channel writer completed");
 #endif
 
-            cancellationTokenSource.Cancel();
+            try
+            {
+                cancellationTokenSource.Cancel();
             
 #if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log("[UdpWorker] Cancellation requested");
+                UnityEngine.Debug.Log("[UdpWorker] Cancellation requested");
 #endif
             
-            cancellationTokenSource.Dispose();
+                cancellationTokenSource.Dispose();
             
 #if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log("[UdpWorker] CancellationTokenSource disposed");
+                UnityEngine.Debug.Log("[UdpWorker] CancellationTokenSource disposed");
 #endif
+            }
+            catch (ObjectDisposedException)
+            {
+#if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.Log("[UdpWorker] CancellationTokenSource already disposed");
+#endif
+            }
+            
 
             if (server.IsValueCreated)
             {
+                try
+                {
 #if MESSAGEPIPE_UDP_DEBUG
-                UnityEngine.Debug.Log("[UdpWorker] Disposing server");
+                    UnityEngine.Debug.Log("[UdpWorker] Disposing server");
 #endif
                 
-                server.Value.Dispose();
+                    server.Value.Dispose();
                 
 #if MESSAGEPIPE_UDP_DEBUG
-                UnityEngine.Debug.Log("[UdpWorker] Server disposed");
+                    UnityEngine.Debug.Log("[UdpWorker] Server disposed");
 #endif
+                }
+                catch (Exception ex)
+                {
+#if MESSAGEPIPE_UDP_DEBUG
+                    UnityEngine.Debug.LogWarning("[UdpWorker] Error disposing server: " + ex.Message);
+#endif
+                }
+                
             }
 
             if (client.IsValueCreated)
             {
+                try
+                {
 #if MESSAGEPIPE_UDP_DEBUG
-                UnityEngine.Debug.Log("[UdpWorker] Disposing client");
+                    UnityEngine.Debug.Log("[UdpWorker] Disposing client");
 #endif
                 
-                client.Value.Dispose();
+                    client.Value.Dispose();
                 
 #if MESSAGEPIPE_UDP_DEBUG
-                UnityEngine.Debug.Log("[UdpWorker] Client disposed");
+                    UnityEngine.Debug.Log("[UdpWorker] Client disposed");
 #endif
+                }
+                catch (Exception ex)
+                {
+#if MESSAGEPIPE_UDP_DEBUG
+                    UnityEngine.Debug.LogWarning("[UdpWorker] Error disposing client: " + ex.Message);
+#endif
+                }
             }
             
 #if MESSAGEPIPE_UDP_DEBUG
