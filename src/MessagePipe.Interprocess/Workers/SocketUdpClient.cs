@@ -129,7 +129,10 @@ namespace MessagePipe.Interprocess.Workers
             
             #if MESSAGEPIPE_UDP_DEBUG
             var startTime = DateTime.UtcNow;
-            UnityEngine.Debug.Log("[SocketUdpServer] Starting receive operation");
+            LogThrottler.ThrottledLog(
+                "SocketUdpServer.StartReceive",
+                count => UnityEngine.Debug.Log("[SocketUdpServer] Starting receive operation (throttled, " + count + " calls)"),
+                500, 5000);
             #endif
             
         #if NET5_0_OR_GREATER
@@ -139,7 +142,10 @@ namespace MessagePipe.Interprocess.Workers
                 
                 #if MESSAGEPIPE_UDP_DEBUG
                 var elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
-                UnityEngine.Debug.Log("[SocketUdpServer] Received " + i + " bytes in " + elapsed + "ms");
+                LogThrottler.ThrottledLog(
+                    "SocketUdpServer.ReceiveComplete",
+                    count => UnityEngine.Debug.Log("[SocketUdpServer] Received " + i + " bytes (throttled, " + count + " packets in last period)"),
+                    100, 2000);
                 #endif
                 
                 return buffer.AsMemory(0, i);
@@ -156,10 +162,13 @@ namespace MessagePipe.Interprocess.Workers
             
             try
             {
-                socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ar =>
+                socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ar => 
                 {
                     #if MESSAGEPIPE_UDP_DEBUG
-                    UnityEngine.Debug.Log("[SocketUdpServer] Begin receive completed");
+                    LogThrottler.ThrottledLog(
+                        "SocketUdpServer.BeginReceiveComplete",
+                        count => UnityEngine.Debug.Log("[SocketUdpServer] Begin receive completed (throttled, " + count + " calls)"),
+                        500, 5000);
                     #endif
                     
                     int i;
@@ -169,7 +178,10 @@ namespace MessagePipe.Interprocess.Workers
                         
                         #if MESSAGEPIPE_UDP_DEBUG
                         var elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
-                        UnityEngine.Debug.Log("[SocketUdpServer] Received " + i + " bytes in " + elapsed + "ms");
+                        LogThrottler.ThrottledLog(
+                            "SocketUdpServer.EndReceiveComplete",
+                            count => UnityEngine.Debug.Log("[SocketUdpServer] Received " + i + " bytes (throttled, " + count + " packets in last period)"),
+                            100, 2000);
                         #endif
                     }
                     catch (Exception ex) 
@@ -368,7 +380,10 @@ namespace MessagePipe.Interprocess.Workers
         public UniTask<int> SendAsync(byte[] data, CancellationToken cancellationToken = default)
         {
             #if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log("[SocketUdpClient] SendAsync to default endpoint, data size: " + data.Length + " bytes");
+            LogThrottler.ThrottledLog(
+                "SocketUdpClient.SendAsync",
+                count => UnityEngine.Debug.Log("[SocketUdpClient] SendAsync called " + count + " times, avg size: " + data.Length + " bytes"),
+                100, 2000);
             #endif
             
             return SendToEndpointAsync(data, remoteEndPoint, cancellationToken);
@@ -380,8 +395,11 @@ namespace MessagePipe.Interprocess.Workers
         public UniTask<int> SendToAsync(byte[] data, string toAddress, CancellationToken cancellationToken = default)
         {
             #if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log("[SocketUdpClient] SendToAsync address: " + 
-                (string.IsNullOrEmpty(toAddress) ? "[default]" : toAddress) + ", data size: " + data.Length + " bytes");
+            LogThrottler.ThrottledLog(
+                "SocketUdpClient.SendToAsync",
+                count => UnityEngine.Debug.Log("[SocketUdpClient] SendToAsync called " + count + " times, address: " + 
+                    (string.IsNullOrEmpty(toAddress) ? "[default]" : toAddress)),
+                100, 2000);
             #endif
             
             if (string.IsNullOrEmpty(toAddress))
@@ -397,7 +415,10 @@ namespace MessagePipe.Interprocess.Workers
                 #if MESSAGEPIPE_UDP_DEBUG
                 if (isBroadcast)
                 {
-                    UnityEngine.Debug.Log("[SocketUdpClient] Detected broadcast address: " + toAddress);
+                    LogThrottler.ThrottledLog(
+                        "SocketUdpClient.BroadcastDetected",
+                        count => UnityEngine.Debug.Log("[SocketUdpClient] Broadcast address detected: " + toAddress + " (" + count + " times)"),
+                        50, 10000);
                 }
                 #endif
                 
@@ -407,14 +428,20 @@ namespace MessagePipe.Interprocess.Workers
                     socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
                     
                     #if MESSAGEPIPE_UDP_DEBUG
-                    UnityEngine.Debug.Log("[SocketUdpClient] Set broadcast option to true");
+                    LogThrottler.ThrottledLog(
+                        "SocketUdpClient.SetBroadcastOption",
+                        count => UnityEngine.Debug.Log("[SocketUdpClient] Set broadcast option to true (" + count + " times)"),
+                        50, 10000);
                     #endif
                 }
                 
                 var endpoint = new IPEndPoint(targetIP, port);
                 
                 #if MESSAGEPIPE_UDP_DEBUG
-                UnityEngine.Debug.Log("[SocketUdpClient] Created endpoint for sending: " + endpoint);
+                LogThrottler.ThrottledLog(
+                    "SocketUdpClient.EndpointCreated",
+                    count => UnityEngine.Debug.Log("[SocketUdpClient] Created endpoint for sending (" + count + " times)"),
+                    200, 5000);
                 #endif
                 
                 return SendToEndpointAsync(data, endpoint, cancellationToken);
@@ -436,8 +463,11 @@ namespace MessagePipe.Interprocess.Workers
         public UniTask<int> SendToAsync(byte[] data, string toAddress, int port, CancellationToken cancellationToken = default)
         {
             #if MESSAGEPIPE_UDP_DEBUG
-            UnityEngine.Debug.Log("[SocketUdpClient] SendToAsync address: " + 
-                (string.IsNullOrEmpty(toAddress) ? "[default]" : toAddress) + ", port: " + port + ", data size: " + data.Length + " bytes");
+            LogThrottler.ThrottledLog(
+                "SocketUdpClient.SendToAsyncWithPort",
+                count => UnityEngine.Debug.Log("[SocketUdpClient] SendToAsync with port called " + count + " times, address: " + 
+                    (string.IsNullOrEmpty(toAddress) ? "[default]" : toAddress) + ", port: " + port),
+                100, 2000);
             #endif
             
             if (string.IsNullOrEmpty(toAddress))
@@ -453,7 +483,10 @@ namespace MessagePipe.Interprocess.Workers
                 #if MESSAGEPIPE_UDP_DEBUG
                 if (isBroadcast)
                 {
-                    UnityEngine.Debug.Log("[SocketUdpClient] Detected broadcast address: " + toAddress + " with specific port: " + port);
+                    LogThrottler.ThrottledLog(
+                        "SocketUdpClient.BroadcastWithPortDetected",
+                        count => UnityEngine.Debug.Log("[SocketUdpClient] Broadcast address with port detected (" + count + " times)"),
+                        50, 10000);
                 }
                 #endif
                 
@@ -463,14 +496,20 @@ namespace MessagePipe.Interprocess.Workers
                     socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
                     
                     #if MESSAGEPIPE_UDP_DEBUG
-                    UnityEngine.Debug.Log("[SocketUdpClient] Set broadcast option to true");
+                    LogThrottler.ThrottledLog(
+                        "SocketUdpClient.SetBroadcastOptionWithPort",
+                        count => UnityEngine.Debug.Log("[SocketUdpClient] Set broadcast option with port to true (" + count + " times)"),
+                        50, 10000);
                     #endif
                 }
                 
                 var endpoint = new IPEndPoint(targetIP, port);
                 
                 #if MESSAGEPIPE_UDP_DEBUG
-                UnityEngine.Debug.Log("[SocketUdpClient] Created endpoint with specific port for sending: " + endpoint);
+                LogThrottler.ThrottledLog(
+                    "SocketUdpClient.EndpointWithPortCreated",
+                    count => UnityEngine.Debug.Log("[SocketUdpClient] Created endpoint with specific port (" + count + " times)"),
+                    200, 5000);
                 #endif
                 
                 return SendToEndpointAsync(data, endpoint, cancellationToken);
@@ -493,7 +532,10 @@ namespace MessagePipe.Interprocess.Workers
         {
             #if MESSAGEPIPE_UDP_DEBUG
             var startTime = DateTime.UtcNow;
-            UnityEngine.Debug.Log("[SocketUdpClient] Starting send operation to endpoint: " + endpoint);
+            LogThrottler.ThrottledLog(
+                "SocketUdpClient.SendToEndpoint" + endpoint.ToString(),
+                count => UnityEngine.Debug.Log("[SocketUdpClient] Starting send operation (" + count + " operations to this endpoint)"),
+                200, 5000);
             #endif
             
         #if NET5_0_OR_GREATER
@@ -502,10 +544,13 @@ namespace MessagePipe.Interprocess.Workers
                 var result = socket.SendToAsync(data, SocketFlags.None, endpoint, cancellationToken);
                 
                 #if MESSAGEPIPE_UDP_DEBUG
-                result.ContinueWith(bytesSent =>
+                result.ContinueWith(bytesSent => 
                 {
                     var elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
-                    UnityEngine.Debug.Log("[SocketUdpClient] Sent " + bytesSent + " bytes to " + endpoint + " in " + elapsed + "ms");
+                    LogThrottler.ThrottledLog(
+                        "SocketUdpClient.SendComplete" + endpoint.ToString(),
+                        count => UnityEngine.Debug.Log("[SocketUdpClient] Sent data successfully (" + count + " sends, avg time: " + elapsed + "ms)"),
+                        100, 2000);
                     return bytesSent;
                 });
                 #endif
@@ -524,7 +569,7 @@ namespace MessagePipe.Interprocess.Workers
             
             try
             {
-                socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, endpoint, ar =>
+                socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, endpoint, ar => 
                 {
                     try 
                     { 
@@ -532,7 +577,10 @@ namespace MessagePipe.Interprocess.Workers
                         
                         #if MESSAGEPIPE_UDP_DEBUG
                         var elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
-                        UnityEngine.Debug.Log("[SocketUdpClient] Sent " + bytesSent + " bytes to " + endpoint + " in " + elapsed + "ms");
+                        LogThrottler.ThrottledLog(
+                            "SocketUdpClient.SendToComplete" + endpoint.ToString(),
+                            count => UnityEngine.Debug.Log("[SocketUdpClient] Sent data successfully (" + count + " sends, avg time: " + elapsed + "ms)"),
+                            100, 2000);
                         #endif
                         
                         tcs.TrySetResult(bytesSent); 
