@@ -57,7 +57,7 @@ namespace MessagePipe
             // ワーカー登録用のフックを追加
             builder.Services.AddSingleton(new WorkerRegistrationHook(options));
             
-            AddAsyncMessageBroker＜IInterprocessKey, IInterprocessValue＞(builder, options);
+            AddAsyncMessageBroker<IInterprocessKey, IInterprocessValue>(builder, options);
             return options;
         #endif
         }
@@ -102,7 +102,7 @@ namespace MessagePipe
             // ワーカー登録用のフックを追加
             builder.Services.AddSingleton(new WorkerRegistrationHook(options));
             
-            AddAsyncMessageBroker＜IInterprocessKey, IInterprocessValue＞(builder, options);
+            AddAsyncMessageBroker<IInterprocessKey, IInterprocessValue>(builder, options);
             return options;
         #endif
         }
