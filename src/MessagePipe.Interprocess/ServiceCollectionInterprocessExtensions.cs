@@ -50,7 +50,7 @@ namespace MessagePipe
             return builder;
         #else
             // Unity環境向け
-            builder.Services.AddSingleton(provider => {
+            builder.Services.Add(typeof(UdpWorker), provider => {
                 var asyncPublisher = provider.GetRequiredService<IAsyncPublisher<IInterprocessKey, IInterprocessValue>>();
                 var worker = new UdpWorker(options, asyncPublisher);
                 options.RegisterWorker(worker); // ワーカーを登録
@@ -101,7 +101,7 @@ namespace MessagePipe
             return builder;
         #else
             // Unity環境向け
-            builder.Services.AddSingleton(provider => {
+            builder.Services.Add(typeof(UdpWorker), provider => {
                 var asyncPublisher = provider.GetRequiredService<IAsyncPublisher<IInterprocessKey, IInterprocessValue>>();
                 var worker = new UdpWorker(options, asyncPublisher);
                 options.RegisterWorker(worker); // ワーカーを登録
