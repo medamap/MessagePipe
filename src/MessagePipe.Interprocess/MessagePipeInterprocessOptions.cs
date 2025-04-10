@@ -1,6 +1,7 @@
 ﻿using MessagePack;
 using MessagePack.Resolvers;
 using System;
+using System.Collections.Generic;
 
 namespace MessagePipe.Interprocess
 {
@@ -10,6 +11,63 @@ namespace MessagePipe.Interprocess
         public InstanceLifetime InstanceLifetime { get; set; }
         public Action<string, Exception> UnhandledErrorHandler { get; set; }
 
+        /// <summary>
+        /// アプリケーション終了時に呼び出されるハンドラ
+        /// これを呼び出すことで、登録されたすべてのワーカーが破棄されます
+        /// </summary>
+        public Action OnApplicationQuitHandler { get; private set; }
+
+        // 内部使用のためのワーカー管理リスト
+        internal readonly List<IDisposable> RegisteredWorkers = new List<IDisposable>();
+        
+        /// <summary>
+        /// 内部使用: ワーカーを登録します
+        /// </summary>
+        internal void RegisterWorker(IDisposable worker)
+        {
+            if (worker != null)
+            {
+                RegisteredWorkers.Add(worker);
+                
+#if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.Log("[MessagePipeInterprocess] Worker registered for cleanup");
+#endif
+            }
+        }
+        
+        /// <summary>
+        /// 内部使用: 登録されたすべてのワーカーを破棄します
+        /// </summary>
+        internal void DisposeAllWorkers()
+        {
+#if MESSAGEPIPE_UDP_DEBUG
+            UnityEngine.Debug.Log("[MessagePipeInterprocess] Disposing all registered workers: " + RegisteredWorkers.Count + " workers");
+#endif
+            
+            foreach (var worker in RegisteredWorkers)
+            {
+                try
+                {
+                    worker.Dispose();
+                    
+#if MESSAGEPIPE_UDP_DEBUG
+                    UnityEngine.Debug.Log("[MessagePipeInterprocess] Worker disposed successfully");
+#endif
+                }
+                catch (Exception ex)
+                {
+                    // エラーハンドリング
+                    UnhandledErrorHandler?.Invoke("Failed to dispose worker", ex);
+                }
+            }
+            
+            RegisteredWorkers.Clear();
+            
+#if MESSAGEPIPE_UDP_DEBUG
+            UnityEngine.Debug.Log("[MessagePipeInterprocess] All workers cleanup completed");
+#endif
+        }
+        
         public MessagePipeInterprocessOptions()
         {
             // ContractlessStandardResolverのオプションを直接使用
@@ -22,6 +80,8 @@ namespace MessagePipe.Interprocess
 #else
             this.UnhandledErrorHandler = (msg, x) => UnityEngine.Debug.Log(msg + x);
 #endif
+            // デフォルトのアプリケーション終了ハンドラを設定
+            this.OnApplicationQuitHandler = DisposeAllWorkers;
         }
     }
 

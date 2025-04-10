@@ -32,4 +32,4 @@ namespace MessagePipe.Interprocess
     public interface IToEndpointable : IToAddressable, IToPortable
     {
     }
-}   
+}

@@ -22,6 +22,23 @@ namespace MessagePipe.Interprocess.Workers
         {
             socket = new Socket(addressFamily, SocketType.Dgram, protocolType);
             socket.ReceiveBufferSize = bufferSize;
+            
+            // REUSE_ADDRESS オプションの追加
+            try
+            {
+                socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.Log("[SocketUdpServer] Set ReuseAddress option to true");
+                #endif
+            }
+            catch (Exception ex)
+            {
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.LogWarning("[SocketUdpServer] Failed to set ReuseAddress option: " + ex.Message);
+                #endif
+            }
+            
             buffer = new byte[Math.Max(bufferSize, MinBuffer)];
         }
         
@@ -35,25 +52,38 @@ namespace MessagePipe.Interprocess.Workers
         public static SocketUdpServer Bind(int port, int bufferSize, bool ignoreBindErrors = false)
         {
             var server = new SocketUdpServer(bufferSize, AddressFamily.InterNetwork, ProtocolType.Udp);
+            
+            #if MESSAGEPIPE_UDP_DEBUG
+            UnityEngine.Debug.Log("[SocketUdpServer] Attempting to bind UDP server to port " + port + " with ReuseAddress enabled");
+            #endif
+            
             try
             {
                 server.socket.Bind(new IPEndPoint(IPAddress.Any, port));
+                
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.Log("[SocketUdpServer] Successfully bound UDP server to port " + port);
+                #endif
             }
             catch (SocketException ex)
             {
                 // バインドに失敗した場合
                 server.IsValid = false;
                 
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.LogError("[SocketUdpServer] Failed to bind UDP socket to port " + port + ". Error code: " + ex.SocketErrorCode);
+                #endif
+                
                 // ignoreBindErrors が false の場合は例外を再スロー
                 if (!ignoreBindErrors)
                 {
-                    throw new InvalidOperationException($"Failed to bind UDP socket to port {port}. This may be due to network restrictions or configuration.", ex);
+                    throw new InvalidOperationException("Failed to bind UDP socket to port " + port + ". This may be due to network restrictions or configuration.", ex);
                 }
                 // ignoreBindErrors が true の場合は例外を無視
             }
             return server;
         }
-        
+
 #if NET5_0_OR_GREATER
         /// <summary>
         /// UNIXドメインソケットサーバーをバインドします
@@ -90,23 +120,81 @@ namespace MessagePipe.Interprocess.Workers
             // 無効状態の場合は空のデータを返す
             if (!IsValid)
             {
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.LogWarning("[SocketUdpServer] ReceiveAsync called but server is not valid, returning empty data");
+                #endif
+                
                 return new ReadOnlyMemory<byte>(Array.Empty<byte>());
             }
             
-#if NET5_0_OR_GREATER
-            int i = await socket.ReceiveAsync(buffer, SocketFlags.None, cancellationToken).ConfigureAwait(false);
-            return buffer.AsMemory(0, i);
-#else
-            var tcs = new UniTaskCompletionSource<ReadOnlyMemory<byte>>();
-            socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ar => 
+            #if MESSAGEPIPE_UDP_DEBUG
+            var startTime = DateTime.UtcNow;
+            UnityEngine.Debug.Log("[SocketUdpServer] Starting receive operation");
+            #endif
+            
+        #if NET5_0_OR_GREATER
+            try
             {
-                int i;
-                try { i = socket.EndReceive(ar); }
-                catch (Exception ex) { tcs.TrySetException(ex); return; }
-                tcs.TrySetResult(buffer.AsMemory(0, i));
-            }, null);
+                int i = await socket.ReceiveAsync(buffer, SocketFlags.None, cancellationToken).ConfigureAwait(false);
+                
+                #if MESSAGEPIPE_UDP_DEBUG
+                var elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
+                UnityEngine.Debug.Log("[SocketUdpServer] Received " + i + " bytes in " + elapsed + "ms");
+                #endif
+                
+                return buffer.AsMemory(0, i);
+            }
+            catch (Exception ex)
+            {
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.LogError("[SocketUdpServer] Error during receive: " + ex.Message);
+                #endif
+                throw;
+            }
+        #else
+            var tcs = new UniTaskCompletionSource<ReadOnlyMemory<byte>>();
+            
+            try
+            {
+                socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ar =>
+                {
+                    #if MESSAGEPIPE_UDP_DEBUG
+                    UnityEngine.Debug.Log("[SocketUdpServer] Begin receive completed");
+                    #endif
+                    
+                    int i;
+                    try 
+                    { 
+                        i = socket.EndReceive(ar);
+                        
+                        #if MESSAGEPIPE_UDP_DEBUG
+                        var elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
+                        UnityEngine.Debug.Log("[SocketUdpServer] Received " + i + " bytes in " + elapsed + "ms");
+                        #endif
+                    }
+                    catch (Exception ex) 
+                    { 
+                        #if MESSAGEPIPE_UDP_DEBUG
+                        UnityEngine.Debug.LogError("[SocketUdpServer] Error during EndReceive: " + ex.Message);
+                        #endif
+                        
+                        tcs.TrySetException(ex); 
+                        return; 
+                    }
+                    tcs.TrySetResult(buffer.AsMemory(0, i));
+                }, null);
+            }
+            catch (Exception ex)
+            {
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.LogError("[SocketUdpServer] Error during BeginReceive: " + ex.Message);
+                #endif
+                
+                tcs.TrySetException(ex);
+            }
+            
             return await tcs.Task;
-#endif
+        #endif
         }
         
         public void Dispose()
@@ -130,6 +218,23 @@ namespace MessagePipe.Interprocess.Workers
         {
             socket = new Socket(addressFamily, SocketType.Dgram, protocolType);
             socket.SendBufferSize = bufferSize;
+            
+            // REUSE_ADDRESS オプションの追加
+            try
+            {
+                socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.Log("[SocketUdpClient] Set ReuseAddress option to true");
+                #endif
+            }
+            catch (Exception ex)
+            {
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.LogWarning("[SocketUdpClient] Failed to set ReuseAddress option: " + ex.Message);
+                #endif
+            }
+            
             buffer = new byte[Math.Max(bufferSize, MinBuffer)];
             this.remoteEndPoint = remoteEndPoint;
             this.useSendTo = useSendTo;
@@ -142,20 +247,28 @@ namespace MessagePipe.Interprocess.Workers
         /// オプションとして subnetMask と networkAddress を指定でき、
         /// これらが設定されている場合は、ブロードキャストアドレスを計算して判定します。
         /// </summary>
-        /// <param name="host">送信先ホスト（通常はIP文字列）</param>
-        /// <param name="port">送信先ポート</param>
-        /// <param name="bufferSize">バッファサイズ</param>
-        /// <param name="subnetMask">サブネットマスク（例: 255.255.255.0 ） ※任意</param>
-        /// <param name="networkAddress">ネットワークアドレス（例: 192.168.1.0 ） ※任意</param>
+        /// <param name= host >送信先ホスト（通常はIP文字列）</param>
+        /// <param name= port >送信先ポート</param>
+        /// <param name= bufferSize >バッファサイズ</param>
+        /// <param name= subnetMask >サブネットマスク（例: 255.255.255.0 ） ※任意</param>
+        /// <param name= networkAddress >ネットワークアドレス（例: 192.168.1.0 ） ※任意</param>
         /// <returns></returns>
         public static SocketUdpClient Connect(string host, int port, int bufferSize, string subnetMask = null, string networkAddress = null)
         {
+            #if MESSAGEPIPE_UDP_DEBUG
+            UnityEngine.Debug.Log("[SocketUdpClient] Connecting to host: " + host + ", port: " + port);
+            #endif
+            
             bool isBroadcast = false;
             IPAddress hostIP = IPAddress.Parse(host);
             // まず、ホストが "255.255.255.255" であればブロードキャスト
             if (hostIP.Equals(IPAddress.Broadcast) || host == "255.255.255.255")
             {
                 isBroadcast = true;
+                
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.Log("[SocketUdpClient] Broadcast address detected");
+                #endif
             }
             // もしサブネット情報が与えられていれば、計算して判定
             else if (!string.IsNullOrEmpty(subnetMask) && !string.IsNullOrEmpty(networkAddress))
@@ -173,16 +286,29 @@ namespace MessagePipe.Interprocess.Workers
                             broadcastBytes[i] = (byte)(networkBytes[i] | (~maskBytes[i]));
                         }
                         var computedBroadcast = new IPAddress(broadcastBytes);
+                        
+                        #if MESSAGEPIPE_UDP_DEBUG
+                        UnityEngine.Debug.Log("[SocketUdpClient] Computed broadcast address: " + computedBroadcast);
+                        #endif
+                        
                         if (hostIP.Equals(computedBroadcast))
                         {
                             isBroadcast = true;
+                            
+                            #if MESSAGEPIPE_UDP_DEBUG
+                            UnityEngine.Debug.Log("[SocketUdpClient] Computed broadcast address matches host address");
+                            #endif
                         }
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     // サブネット情報の解析に失敗した場合は、通常の接続とする
                     isBroadcast = false;
+                    
+                    #if MESSAGEPIPE_UDP_DEBUG
+                    UnityEngine.Debug.LogWarning("[SocketUdpClient] Failed to parse subnet information: " + ex.Message);
+                    #endif
                 }
             }
 
@@ -193,6 +319,11 @@ namespace MessagePipe.Interprocess.Workers
                 var endpoint = new IPEndPoint(broadcastIP, port);
                 var client = new SocketUdpClient(bufferSize, broadcastIP.AddressFamily, ProtocolType.Udp, endpoint, true, port);
                 client.socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
+                
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.Log("[SocketUdpClient] Created client for broadcast with endpoint: " + endpoint);
+                #endif
+                
                 return client;
             }
             else
@@ -200,7 +331,23 @@ namespace MessagePipe.Interprocess.Workers
                 // 通常接続の場合
                 var endpoint = new IPEndPoint(hostIP, port);
                 var client = new SocketUdpClient(bufferSize, hostIP.AddressFamily, ProtocolType.Udp, endpoint, false, port);
-                client.socket.Connect(endpoint);
+                
+                try
+                {
+                    client.socket.Connect(endpoint);
+                    
+                    #if MESSAGEPIPE_UDP_DEBUG
+                    UnityEngine.Debug.Log("[SocketUdpClient] Successfully connected to " + endpoint);
+                    #endif
+                }
+                catch (Exception ex)
+                {
+                    #if MESSAGEPIPE_UDP_DEBUG
+                    UnityEngine.Debug.LogError("[SocketUdpClient] Failed to connect to " + endpoint + ": " + ex.Message);
+                    #endif
+                    throw; // 例外を再スロー
+                }
+                
                 return client;
             }
         }
@@ -220,6 +367,10 @@ namespace MessagePipe.Interprocess.Workers
         /// </summary>
         public UniTask<int> SendAsync(byte[] data, CancellationToken cancellationToken = default)
         {
+            #if MESSAGEPIPE_UDP_DEBUG
+            UnityEngine.Debug.Log("[SocketUdpClient] SendAsync to default endpoint, data size: " + data.Length + " bytes");
+            #endif
+            
             return SendToEndpointAsync(data, remoteEndPoint, cancellationToken);
         }
 
@@ -228,6 +379,11 @@ namespace MessagePipe.Interprocess.Workers
         /// </summary>
         public UniTask<int> SendToAsync(byte[] data, string toAddress, CancellationToken cancellationToken = default)
         {
+            #if MESSAGEPIPE_UDP_DEBUG
+            UnityEngine.Debug.Log("[SocketUdpClient] SendToAsync address: " + 
+                (string.IsNullOrEmpty(toAddress) ? "[default]" : toAddress) + ", data size: " + data.Length + " bytes");
+            #endif
+            
             if (string.IsNullOrEmpty(toAddress))
             {
                 return SendAsync(data, cancellationToken);
@@ -238,17 +394,37 @@ namespace MessagePipe.Interprocess.Workers
                 IPAddress targetIP = IPAddress.Parse(toAddress);
                 bool isBroadcast = targetIP.Equals(IPAddress.Broadcast) || toAddress == "255.255.255.255";
                 
+                #if MESSAGEPIPE_UDP_DEBUG
+                if (isBroadcast)
+                {
+                    UnityEngine.Debug.Log("[SocketUdpClient] Detected broadcast address: " + toAddress);
+                }
+                #endif
+                
                 // ブロードキャストの場合はソケットオプションを設定
                 if (isBroadcast)
                 {
                     socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
+                    
+                    #if MESSAGEPIPE_UDP_DEBUG
+                    UnityEngine.Debug.Log("[SocketUdpClient] Set broadcast option to true");
+                    #endif
                 }
                 
                 var endpoint = new IPEndPoint(targetIP, port);
+                
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.Log("[SocketUdpClient] Created endpoint for sending: " + endpoint);
+                #endif
+                
                 return SendToEndpointAsync(data, endpoint, cancellationToken);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.LogWarning("[SocketUdpClient] Error parsing address " + toAddress + ": " + ex.Message + ". Using default endpoint.");
+                #endif
+                
                 // アドレス解析に失敗した場合はデフォルトエンドポイントを使用
                 return SendAsync(data, cancellationToken);
             }
@@ -259,6 +435,11 @@ namespace MessagePipe.Interprocess.Workers
         /// </summary>
         public UniTask<int> SendToAsync(byte[] data, string toAddress, int port, CancellationToken cancellationToken = default)
         {
+            #if MESSAGEPIPE_UDP_DEBUG
+            UnityEngine.Debug.Log("[SocketUdpClient] SendToAsync address: " + 
+                (string.IsNullOrEmpty(toAddress) ? "[default]" : toAddress) + ", port: " + port + ", data size: " + data.Length + " bytes");
+            #endif
+            
             if (string.IsNullOrEmpty(toAddress))
             {
                 return SendAsync(data, cancellationToken);
@@ -268,43 +449,119 @@ namespace MessagePipe.Interprocess.Workers
             {
                 IPAddress targetIP = IPAddress.Parse(toAddress);
                 bool isBroadcast = targetIP.Equals(IPAddress.Broadcast) || toAddress == "255.255.255.255";
-        
+                
+                #if MESSAGEPIPE_UDP_DEBUG
+                if (isBroadcast)
+                {
+                    UnityEngine.Debug.Log("[SocketUdpClient] Detected broadcast address: " + toAddress + " with specific port: " + port);
+                }
+                #endif
+                
                 // ブロードキャストの場合はソケットオプションを設定
                 if (isBroadcast)
                 {
                     socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
+                    
+                    #if MESSAGEPIPE_UDP_DEBUG
+                    UnityEngine.Debug.Log("[SocketUdpClient] Set broadcast option to true");
+                    #endif
                 }
-        
+                
                 var endpoint = new IPEndPoint(targetIP, port);
+                
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.Log("[SocketUdpClient] Created endpoint with specific port for sending: " + endpoint);
+                #endif
+                
                 return SendToEndpointAsync(data, endpoint, cancellationToken);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.LogWarning("[SocketUdpClient] Error parsing address " + toAddress + ": " + ex.Message + ". Using default endpoint.");
+                #endif
+                
                 // アドレス解析に失敗した場合はデフォルトエンドポイントを使用
                 return SendAsync(data, cancellationToken);
             }
         }
-        
+
         /// <summary>
         /// 指定されたエンドポイントにデータを送信します
         /// </summary>
         private UniTask<int> SendToEndpointAsync(byte[] data, EndPoint endpoint, CancellationToken cancellationToken = default)
         {
-#if NET5_0_OR_GREATER
-            return socket.SendToAsync(data, SocketFlags.None, endpoint, cancellationToken);
-#else
-            var tcs = new UniTaskCompletionSource<int>();
-            socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, endpoint, ar => 
+            #if MESSAGEPIPE_UDP_DEBUG
+            var startTime = DateTime.UtcNow;
+            UnityEngine.Debug.Log("[SocketUdpClient] Starting send operation to endpoint: " + endpoint);
+            #endif
+            
+        #if NET5_0_OR_GREATER
+            try
             {
-                try { tcs.TrySetResult(socket.EndSendTo(ar)); }
-                catch (Exception ex) { tcs.TrySetException(ex); }
-            }, null);
-#if !UNITY_2018_3_OR_NEWER
+                var result = socket.SendToAsync(data, SocketFlags.None, endpoint, cancellationToken);
+                
+                #if MESSAGEPIPE_UDP_DEBUG
+                result.ContinueWith(bytesSent =>
+                {
+                    var elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
+                    UnityEngine.Debug.Log("[SocketUdpClient] Sent " + bytesSent + " bytes to " + endpoint + " in " + elapsed + "ms");
+                    return bytesSent;
+                });
+                #endif
+                
+                return result;
+            }
+            catch (Exception ex)
+            {
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.LogError("[SocketUdpClient] Error during send to " + endpoint + ": " + ex.Message);
+                #endif
+                throw;
+            }
+        #else
+            var tcs = new UniTaskCompletionSource<int>();
+            
+            try
+            {
+                socket.BeginSendTo(data, 0, data.Length, SocketFlags.None, endpoint, ar =  
+                {
+                    try 
+                    { 
+                        int bytesSent = socket.EndSendTo(ar);
+                        
+                        #if MESSAGEPIPE_UDP_DEBUG
+                        var elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
+                        UnityEngine.Debug.Log("[SocketUdpClient] Sent " + bytesSent + " bytes to " + endpoint + " in " + elapsed + "ms");
+                        #endif
+                        
+                        tcs.TrySetResult(bytesSent); 
+                    }
+                    catch (Exception ex) 
+                    { 
+                        #if MESSAGEPIPE_UDP_DEBUG
+                        UnityEngine.Debug.LogError("[SocketUdpClient] Error during EndSendTo to " + endpoint + ": " + ex.Message);
+                        #endif
+                        
+                        tcs.TrySetException(ex); 
+                    }
+                }, null);
+            }
+            catch (Exception ex)
+            {
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.LogError("[SocketUdpClient] Error during BeginSendTo to " + endpoint + ": " + ex.Message);
+                #endif
+                
+                tcs.TrySetException(ex);
+            }
+            
+        #if !UNITY_2018_3_OR_NEWER
             return new UniTask<int>(tcs.Task);
-#else
+        #else
             return tcs.Task;
-#endif
-#endif
+        #endif
+        #endif
         }
 
         public void Dispose()

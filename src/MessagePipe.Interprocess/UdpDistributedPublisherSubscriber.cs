@@ -14,8 +14,18 @@ namespace MessagePipe.Interprocess
         string GetToAddress();
     }
     
+    /// <summary>
+    /// 破棄可能な発行者を表すインターフェース
+    /// </summary>
+    public interface IDisposablePublisher<T> : IDisposable
+    {
+        // 特別なメソッドは必要なく、IDisposableの継承だけで十分
+    }
+    
     [Preserve]
-    public sealed class UdpDistributedPublisher<TKey, TMessage> : IDistributedPublisher<TKey, TMessage>
+    public sealed class UdpDistributedPublisher<TKey, TMessage> : 
+        IDistributedPublisher<TKey, TMessage>,
+        IDisposablePublisher<TMessage>
     {
         readonly UdpWorker worker;
 
@@ -99,8 +109,21 @@ namespace MessagePipe.Interprocess
         {
             return new FluentUdpPublisher(worker, worker.Options);
         }
+
+        // IDisposableの実装
+        public void Dispose()
+        {
+            #if MESSAGEPIPE_UDP_DEBUG
+            UnityEngine.Debug.Log("[UdpDistributedPublisher] Disposing");
+            #endif
+            
+            // UdpWorkerはDIコンテナによって管理されるため、
+            // ここでは特に何もしない
+            // 注: もし独自にworkerを生成したケースがあれば
+            // その場合はDisposeが必要
+        }
     }
-    
+
     // UdpDistributedSubscriber は変更なし - 完全に保持
     [Preserve]
     public sealed class UdpDistributedSubscriber<TKey, TMessage> : IDistributedSubscriber<TKey, TMessage>

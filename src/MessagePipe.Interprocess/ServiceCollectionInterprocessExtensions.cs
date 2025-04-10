@@ -27,16 +27,44 @@ namespace MessagePipe
             configure(options);
 
             builder.Services.AddSingleton(options);
-            builder.Services.Add(typeof(UdpWorker), options.InstanceLifetime);
-
-#if !UNITY_2018_3_OR_NEWER
+            
+            // UdpWorkerの登録方法を変更
+        #if !UNITY_2018_3_OR_NEWER
+            // 非Unity環境向け
+            var lifetime = (options.InstanceLifetime == InstanceLifetime.Scoped) ? ServiceLifetime.Scoped
+                : (options.InstanceLifetime == InstanceLifetime.Singleton) ? ServiceLifetime.Singleton
+                : ServiceLifetime.Transient;
+                
+            builder.Services.Add(new ServiceDescriptor(
+                typeof(UdpWorker),
+                provider => {
+                    var asyncPublisher = provider.GetRequiredService<IAsyncPublisher<IInterprocessKey, IInterprocessValue>>();
+                    var worker = new UdpWorker(options, asyncPublisher);
+                    options.RegisterWorker(worker); // ワーカーを登録
+                    return worker;
+                },
+                lifetime));
+                
             builder.Services.Add(typeof(IDistributedPublisher<,>), typeof(UdpDistributedPublisher<,>), options.InstanceLifetime);
             builder.Services.Add(typeof(IDistributedSubscriber<,>), typeof(UdpDistributedSubscriber<,>), options.InstanceLifetime);
             return builder;
-#else
-        AddAsyncMessageBroker<IInterprocessKey, IInterprocessValue>(builder, options);
-        return options;
-#endif
+        #else
+            // Unity環境向け
+            builder.Services.AddSingleton(provider => {
+                var asyncPublisher = provider.GetRequiredService<IAsyncPublisher<IInterprocessKey, IInterprocessValue>>();
+                var worker = new UdpWorker(options, asyncPublisher);
+                options.RegisterWorker(worker); // ワーカーを登録
+                
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.Log("[ServiceCollectionInterprocessExtensions] UdpWorker created and registered for cleanup");
+                #endif
+                
+                return worker;
+            });
+            
+            AddAsyncMessageBroker<IInterprocessKey, IInterprocessValue>(builder, options);
+            return options;
+        #endif
         }
 
         public static ReturnType AddUdpInterprocess(this IMessagePipeBuilder builder, string host, int port)
@@ -50,16 +78,44 @@ namespace MessagePipe
             configure(options);
 
             builder.Services.AddSingleton(options);
-            builder.Services.Add(typeof(UdpWorker), options.InstanceLifetime);
-
-#if !UNITY_2018_3_OR_NEWER
+            
+            // UdpWorkerの登録方法を変更
+        #if !UNITY_2018_3_OR_NEWER
+            // 非Unity環境向け
+            var lifetime = (options.InstanceLifetime == InstanceLifetime.Scoped) ? ServiceLifetime.Scoped
+                : (options.InstanceLifetime == InstanceLifetime.Singleton) ? ServiceLifetime.Singleton
+                : ServiceLifetime.Transient;
+                
+            builder.Services.Add(new ServiceDescriptor(
+                typeof(UdpWorker),
+                provider => {
+                    var asyncPublisher = provider.GetRequiredService<IAsyncPublisher<IInterprocessKey, IInterprocessValue>>();
+                    var worker = new UdpWorker(options, asyncPublisher);
+                    options.RegisterWorker(worker); // ワーカーを登録
+                    return worker;
+                },
+                lifetime));
+                
             builder.Services.Add(typeof(IDistributedPublisher<,>), typeof(UdpDistributedPublisher<,>), options.InstanceLifetime);
             builder.Services.Add(typeof(IDistributedSubscriber<,>), typeof(UdpDistributedSubscriber<,>), options.InstanceLifetime);
             return builder;
-#else
+        #else
+            // Unity環境向け
+            builder.Services.AddSingleton(provider => {
+                var asyncPublisher = provider.GetRequiredService<IAsyncPublisher<IInterprocessKey, IInterprocessValue>>();
+                var worker = new UdpWorker(options, asyncPublisher);
+                options.RegisterWorker(worker); // ワーカーを登録
+                
+                #if MESSAGEPIPE_UDP_DEBUG
+                UnityEngine.Debug.Log("[ServiceCollectionInterprocessExtensions] UdpWorker created and registered for cleanup");
+                #endif
+                
+                return worker;
+            });
+            
             AddAsyncMessageBroker<IInterprocessKey, IInterprocessValue>(builder, options);
             return options;
-#endif
+        #endif
         }
 
         public static ReturnType AddTcpInterprocess(this IMessagePipeBuilder builder, string host, int port)
