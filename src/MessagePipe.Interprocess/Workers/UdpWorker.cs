@@ -660,6 +660,15 @@ namespace MessagePipe.Interprocess.Workers
                     
                     var message = MessageBuilder.ReadPubSubMessage(value.ToArray());
                     
+                    // nullチェックを追加
+                    if (message == null)
+                    {
+                        #if MESSAGEPIPE_UDP_DEBUG
+                        UnityEngine.Debug.LogWarning("[UdpWorker] Parsed message is null, skipping publish");
+                        #endif
+                        continue;
+                    }
+                    
                     #if MESSAGEPIPE_UDP_DEBUG
                     LogThrottler.ThrottledLog(
                         "UdpWorker.MessageParsed",
@@ -668,9 +677,26 @@ namespace MessagePipe.Interprocess.Workers
                         100, 2000);
                     #endif
                     
-                    publisher.Publish(message, message, CancellationToken.None);
-                    
-                    messageCount++;
+                    // publisherのnullチェックも追加
+                    if (publisher != null)
+                    {
+                        publisher.Publish(message, message, CancellationToken.None);
+        
+                        messageCount++;
+        
+                        #if MESSAGEPIPE_UDP_DEBUG
+                        LogThrottler.ThrottledLog(
+                            "UdpWorker.MessagePublished",
+                            count ＝＞ UnityEngine.Debug.Log("[UdpWorker] Published " + count + " messages to subscribers"),
+                            100, 2000);
+                        #endif
+                    }
+                    else
+                    {
+                        #if MESSAGEPIPE_UDP_DEBUG
+                        UnityEngine.Debug.LogError("[UdpWorker] Publisher is null, cannot publish message");
+                        #endif
+                    }
                     
                     #if MESSAGEPIPE_UDP_DEBUG
                     LogThrottler.ThrottledLog(
