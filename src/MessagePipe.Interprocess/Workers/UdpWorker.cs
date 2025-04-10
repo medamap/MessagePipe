@@ -700,7 +700,7 @@ namespace MessagePipe.Interprocess.Workers
                         // パブリッシュ中の例外を処理
                         errorCount++;
 #if MESSAGEPIPE_UDP_DEBUG
-                        UnityEngine.Debug.LogError(＂[UdpWorker] Error during publish: ＂ + pubEx.Message);
+                        UnityEngine.Debug.LogError("[UdpWorker] Error during publish: " + pubEx.Message);
 #endif
                         options.UnhandledErrorHandler("Error during message publish", pubEx);
                     }
