@@ -687,7 +687,7 @@ namespace MessagePipe.Interprocess.Workers
                         #if MESSAGEPIPE_UDP_DEBUG
                         LogThrottler.ThrottledLog(
                             "UdpWorker.MessagePublished",
-                            count ＝＞ UnityEngine.Debug.Log("[UdpWorker] Published " + count + " messages to subscribers"),
+                            count => UnityEngine.Debug.Log("[UdpWorker] Published " + count + " messages to subscribers"),
                             100, 2000);
                         #endif
                     }
