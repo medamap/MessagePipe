@@ -18,6 +18,34 @@ namespace MessagePipe.Interprocess.Workers
         public int? Port { get; set; } // ポート番号を追加
     }
 
+    /// ＜summary＞
+    /// ワーカー登録用のフック
+    /// ＜/summary＞
+    [Preserve]
+    public class WorkerRegistrationHook
+    {
+        private readonly MessagePipeInterprocessOptions _options;
+    
+        public WorkerRegistrationHook(MessagePipeInterprocessOptions options)
+        {
+            _options = options;
+        }
+    
+        // これはDI解決時に呼ばれるメソッド
+        [Preserve]
+        public void RegisterWorker(UdpWorker worker)
+        {
+            if (worker != null)
+            {
+                _options.RegisterWorker(worker);
+            
+#if MESSAGEPIPE_UDP_DEBUG
+            UnityEngine.Debug.Log(＂[WorkerRegistrationHook] UdpWorker registered for cleanup＂);
+#endif
+            }
+        }
+    }
+    
     [Preserve]
     public sealed class UdpWorker : IDisposable
     {
@@ -40,7 +68,7 @@ namespace MessagePipe.Interprocess.Workers
 
         // create from DI
         [Preserve]
-        public UdpWorker(MessagePipeInterprocessUdpOptions options, IAsyncPublisher<IInterprocessKey, IInterprocessValue> publisher)
+        public UdpWorker(MessagePipeInterprocessUdpOptions options, IAsyncPublisher<IInterprocessKey, IInterprocessValue> publisher, WorkerRegistrationHook hook = null)
         {
             #if MESSAGEPIPE_UDP_DEBUG
             UnityEngine.Debug.Log("[UdpWorker] Initializing with options - Host: " + options.Host + ", Port: " + options.Port 
@@ -95,6 +123,8 @@ namespace MessagePipe.Interprocess.Workers
             UnityEngine.Debug.Log("[UdpWorker] Created single consumer unbounded channel for messages");
             #endif
     #endif
+            // フックが提供された場合は登録を行う
+            hook?.RegisterWorker(this);
         }
 
     #if NET5_0_OR_GREATER
