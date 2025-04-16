@@ -192,7 +192,7 @@ namespace MessagePipe.Interprocess.Workers
         {
             #if MESSAGEPIPE_UDP_DEBUG
             LogThrottler.ThrottledLog(
-                "UdpWorker.Publish",
+                $"UdpWorker.Publish.{typeof(TMessage).Name}",
                 count => UnityEngine.Debug.Log("[UdpWorker] Publishing messages (" + count + " times) of type " + typeof(TMessage).Name),
                 100, 2000);
             #endif
@@ -660,11 +660,13 @@ namespace MessagePipe.Interprocess.Workers
                     
                     var message = MessageBuilder.ReadPubSubMessage(value.ToArray());
                     
+                    // トピック名（キー）を文字列として取得
+                    var topicName = System.Text.Encoding.UTF8.GetString(message.KeyMemory.ToArray());
+
                     #if MESSAGEPIPE_UDP_DEBUG
                     LogThrottler.ThrottledLog(
-                        "UdpWorker.MessageParsed",
-                        count => UnityEngine.Debug.Log("[UdpWorker] Parsed " + count + " messages, avg key length: " + 
-                            message.KeyMemory.Length + ", avg value length: " + message.ValueMemory.Length),
+                        $"UdpWorker.MessageParsed.{topicName}", // トピックごとに別々のキーでスロットリング
+                        count => UnityEngine.Debug.Log($"[UdpWorker] Parsed {count} messages for topic: {topicName}, value length: {message.ValueMemory.Length}"),
                         100, 2000);
                     #endif
                     
