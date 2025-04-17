@@ -77,7 +77,12 @@ namespace MessagePipe.Interprocess.Workers
                 AllowSynchronousContinuations = true
             });
 #else
-            this.channel = Channel.CreateSingleConsumerUnbounded<TcpMessageContainer>();
+            this.channel = Channel.CreateUnbounded<TcpMessageContainer>(new UnboundedChannelOptions()
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                AllowSynchronousContinuations = true
+            });
 #endif
 
             // 接続プールの初期化
