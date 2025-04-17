@@ -2,14 +2,13 @@
 using System;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
 {
     [Preserve]
     public sealed class InMemoryDistributedPublisher<TKey, TMessage> : IDistributedPublisher<TKey, TMessage>
-    where TKey : notnull
+    
     {
         readonly IAsyncPublisher<TKey, TMessage> publisher;
 
@@ -27,7 +26,7 @@ namespace MessagePipe
 
     [Preserve]
     public sealed class InMemoryDistributedSubscriber<TKey, TMessage> : IDistributedSubscriber<TKey, TMessage>
-        where TKey : notnull
+        
     {
         readonly IAsyncSubscriber<TKey, TMessage> subscriber;
 

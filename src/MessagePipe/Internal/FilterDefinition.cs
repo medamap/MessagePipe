@@ -25,7 +25,7 @@ namespace MessagePipe.Internal
 
     internal sealed class MessageHandlerFilterDefinition : FilterDefinition
     {
-        public Type? MessageType { get; }
+        public Type MessageType { get; }
         public bool IsOpenGenerics { get; }
 
         public MessageHandlerFilterDefinition(Type filterType, int order, Type interfaceGenericDefinition)
@@ -49,8 +49,8 @@ namespace MessagePipe.Internal
 
     internal sealed class RequestHandlerFilterDefinition : FilterDefinition
     {
-        public Type? RequestType { get; }
-        public Type? ResponseType { get; }
+        public Type RequestType { get; }
+        public Type ResponseType { get; }
         public bool IsOpenGenerics { get; }
 
         public RequestHandlerFilterDefinition(Type filterType, int order, Type interfaceGenericDefinition)

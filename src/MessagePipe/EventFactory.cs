@@ -1,7 +1,7 @@
 ﻿using MessagePipe.Internal;
 using System;
 using System.Threading;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
 {
@@ -137,12 +137,12 @@ namespace MessagePipe
             core.Publish(message, cancellationToken);
         }
 
-        public ValueTask PublishAsync(TMessage message, CancellationToken cancellationToken)
+        public UniTask PublishAsync(TMessage message, CancellationToken cancellationToken)
         {
             return core.PublishAsync(message, cancellationToken);
         }
 
-        public ValueTask PublishAsync(TMessage message, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken)
+        public UniTask PublishAsync(TMessage message, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken)
         {
             return core.PublishAsync(message, publishStrategy, cancellationToken);
         }
@@ -169,12 +169,12 @@ namespace MessagePipe
             broker.Publish(message, cancellationToken);
         }
 
-        public ValueTask PublishAsync(TMessage message, CancellationToken cancellationToken)
+        public UniTask PublishAsync(TMessage message, CancellationToken cancellationToken)
         {
             return broker.PublishAsync(message, cancellationToken);
         }
 
-        public ValueTask PublishAsync(TMessage message, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken)
+        public UniTask PublishAsync(TMessage message, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken)
         {
             return broker.PublishAsync(message, publishStrategy, cancellationToken);
         }

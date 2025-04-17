@@ -16,14 +16,14 @@ namespace MessagePipe
         }
 
         public static IObservable<TMessage> AsObservable<TKey, TMessage>(this ISubscriber<TKey, TMessage> subscriber, TKey key, params MessageHandlerFilter<TMessage>[] filters)
-            where TKey : notnull
+            
         {
             return new ObservableSubscriber<TKey, TMessage>(key, subscriber, filters);
         }
     }
 
     internal sealed class ObservableSubscriber<TKey, TMessage> : IObservable<TMessage>
-        where TKey : notnull
+        
     {
         readonly TKey key;
         readonly ISubscriber<TKey, TMessage> subscriber;

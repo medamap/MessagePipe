@@ -1,16 +1,15 @@
 ﻿using System;
 using System.Threading;
-using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
 {
-    public interface IDistributedPublisher<in TKey, in TMessage>
+    public interface IDistributedPublisher<TKey, TMessage>
     {
         UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = default);
     }
 
-    public interface IDistributedSubscriber<in TKey, TMessage>
+    public interface IDistributedSubscriber<TKey, TMessage>
     {
         UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, CancellationToken cancellationToken = default);
         UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, MessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default);

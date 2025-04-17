@@ -11,9 +11,9 @@ namespace MessagePipe
 {
     public static class GlobalMessagePipe
     {
-        static IServiceProvider? provider;
-        static EventFactory? eventFactory;
-        static MessagePipeDiagnosticsInfo? diagnosticsInfo;
+        static IServiceProvider provider;
+        static EventFactory eventFactory;
+        static MessagePipeDiagnosticsInfo diagnosticsInfo;
 
         public static void SetProvider(IServiceProvider provider)
         {
@@ -58,28 +58,28 @@ namespace MessagePipe
         }
 
         public static IPublisher<TKey, TMessage> GetPublisher<TKey, TMessage>()
-            where TKey : notnull
+            
         {
             ThrowIfNotInitialized();
             return provider.GetRequiredService<IPublisher<TKey, TMessage>>();
         }
 
         public static ISubscriber<TKey, TMessage> GetSubscriber<TKey, TMessage>()
-            where TKey : notnull
+            
         {
             ThrowIfNotInitialized();
             return provider.GetRequiredService<ISubscriber<TKey, TMessage>>();
         }
 
         public static IAsyncPublisher<TKey, TMessage> GetAsyncPublisher<TKey, TMessage>()
-            where TKey : notnull
+            
         {
             ThrowIfNotInitialized();
             return provider.GetRequiredService<IAsyncPublisher<TKey, TMessage>>();
         }
 
         public static IAsyncSubscriber<TKey, TMessage> GetAsyncSubscriber<TKey, TMessage>()
-            where TKey : notnull
+            
         {
             ThrowIfNotInitialized();
             return provider.GetRequiredService<IAsyncSubscriber<TKey, TMessage>>();
@@ -136,14 +136,14 @@ namespace MessagePipe
 #if !UNITY_2018_3_OR_NEWER
 
         public static IDistributedPublisher<TKey, TMessage> GetDistributedPublisher<TKey, TMessage>()
-            where TKey : notnull
+            
         {
             ThrowIfNotInitialized();
             return provider.GetRequiredService<IDistributedPublisher<TKey, TMessage>>();
         }
 
         public static IDistributedSubscriber<TKey, TMessage> GetDistributedSubscriber<TKey, TMessage>()
-            where TKey : notnull
+            
         {
             ThrowIfNotInitialized();
             return provider.GetRequiredService<IDistributedSubscriber<TKey, TMessage>>();

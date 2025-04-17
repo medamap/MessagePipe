@@ -47,7 +47,7 @@ namespace MessagePipe.Internal
             int head = this.head;
             T[] array = this.array;
             T removed = array[head];
-            array[head] = default!;
+            array[head] = default;
             MoveNext(ref this.head);
             size--;
             return removed;

@@ -681,7 +681,13 @@ namespace MessagePipe.Interprocess.Workers
 
                     try
                     {
+                        #if MESSAGEPIPE_UDP_DEBUG
+                        UnityEngine.Debug.Log($"[UdpWorker] About to publish message with topic: {topicName}, hash: {message.GetHashCode()}");
+                        #endif
                         publisher.Publish(message, message, CancellationToken.None);
+                        #if MESSAGEPIPE_UDP_DEBUG
+                        UnityEngine.Debug.Log($"[UdpWorker] Published message with topic: {topicName}");
+                        #endif
     
                         messageCount++;
         

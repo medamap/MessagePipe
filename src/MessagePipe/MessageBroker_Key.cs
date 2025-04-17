@@ -6,7 +6,7 @@ namespace MessagePipe
 {
     [Preserve]
     public class MessageBroker<TKey, TMessage> : IPublisher<TKey, TMessage>, ISubscriber<TKey, TMessage>
-        where TKey : notnull
+        
     {
         readonly MessageBrokerCore<TKey, TMessage> core;
         readonly FilterAttachedMessageHandlerFactory handlerFactory;
@@ -31,7 +31,7 @@ namespace MessagePipe
 
     [Preserve]
     public class MessageBrokerCore<TKey, TMessage> : IDisposable
-    where TKey : notnull
+    
     {
         readonly Dictionary<TKey, HandlerHolder> handlerGroup;
         readonly MessagePipeDiagnosticsInfo diagnotics;
@@ -50,7 +50,7 @@ namespace MessagePipe
 
         public void Publish(TKey key, TMessage message)
         {
-            IMessageHandler<TMessage>?[] handlers;
+            IMessageHandler<TMessage>[] handlers;
             lock (gate)
             {
                 if (!handlerGroup.TryGetValue(key, out var holder))
@@ -108,7 +108,7 @@ namespace MessagePipe
                 this.core = core;
             }
 
-            public IMessageHandler<TMessage>?[] GetHandlers() => handlers.GetValues();
+            public IMessageHandler<TMessage>[] GetHandlers() => handlers.GetValues();
 
             public IDisposable Subscribe(TKey key, IMessageHandler<TMessage> handler)
             {
@@ -170,7 +170,7 @@ namespace MessagePipe
 
     [Preserve]
     public class SingletonMessageBroker<TKey, TMessage> : MessageBroker<TKey, TMessage>, ISingletonPublisher<TKey, TMessage>, ISingletonSubscriber<TKey, TMessage>
-        where TKey : notnull
+        
     {
         public SingletonMessageBroker(SingletonMessageBrokerCore<TKey, TMessage> core, FilterAttachedMessageHandlerFactory handlerFactory)
             : base(core, handlerFactory)
@@ -180,7 +180,7 @@ namespace MessagePipe
 
     [Preserve]
     public class SingletonMessageBrokerCore<TKey, TMessage> : MessageBrokerCore<TKey, TMessage>
-        where TKey : notnull
+        
     {
         public SingletonMessageBrokerCore(MessagePipeDiagnosticsInfo diagnotics, MessagePipeOptions options)
             : base(diagnotics, options)
@@ -190,7 +190,7 @@ namespace MessagePipe
 
     [Preserve]
     public class ScopedMessageBroker<TKey, TMessage> : MessageBroker<TKey, TMessage>, IScopedPublisher<TKey, TMessage>, IScopedSubscriber<TKey, TMessage>
-        where TKey : notnull
+        
     {
         public ScopedMessageBroker(ScopedMessageBrokerCore<TKey, TMessage> core, FilterAttachedMessageHandlerFactory handlerFactory)
             : base(core, handlerFactory)
@@ -200,7 +200,7 @@ namespace MessagePipe
 
     [Preserve]
     public class ScopedMessageBrokerCore<TKey, TMessage> : MessageBrokerCore<TKey, TMessage>
-        where TKey : notnull
+        
     {
         public ScopedMessageBrokerCore(MessagePipeDiagnosticsInfo diagnotics, MessagePipeOptions options)
             : base(diagnotics, options)

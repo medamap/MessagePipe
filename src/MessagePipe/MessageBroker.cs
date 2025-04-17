@@ -141,7 +141,7 @@ namespace MessagePipe
         static readonly bool IsValueType = typeof(TMessage).IsValueType;
 
         readonly MessageBrokerCore<TMessage> core;
-        TMessage? lastMessage;
+        TMessage lastMessage;
 
         [Preserve]
         public BufferedMessageBrokerCore(MessageBrokerCore<TMessage> core)
@@ -160,7 +160,7 @@ namespace MessagePipe
         {
             if (IsValueType || lastMessage != null)
             {
-                handler.Handle(lastMessage!);
+                handler.Handle(lastMessage);
             }
             return core.Subscribe(handler);
         }

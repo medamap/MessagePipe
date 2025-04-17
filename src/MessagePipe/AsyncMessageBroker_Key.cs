@@ -1,15 +1,18 @@
-﻿using MessagePipe.Internal;
+﻿#if !UNITY_2018_3_OR_NEWER
+#define UNITY_2018_3_OR_NEWER
+#endif
+
+using MessagePipe.Internal;
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
 {
     [Preserve]
     public class AsyncMessageBroker<TKey, TMessage> : IAsyncPublisher<TKey, TMessage>, IAsyncSubscriber<TKey, TMessage>
-        where TKey : notnull
+        
     {
         readonly AsyncMessageBrokerCore<TKey, TMessage> core;
         readonly FilterAttachedAsyncMessageHandlerFactory handlerFactory;
@@ -44,7 +47,7 @@ namespace MessagePipe
 
     [Preserve]
     public class AsyncMessageBrokerCore<TKey, TMessage> : IDisposable
-        where TKey : notnull
+        
     {
         readonly Dictionary<TKey, HandlerHolder> handlerGroup;
         readonly MessagePipeDiagnosticsInfo diagnotics;
@@ -65,7 +68,7 @@ namespace MessagePipe
 
         public void Publish(TKey key, TMessage message, CancellationToken cancellationToken)
         {
-            IAsyncMessageHandler<TMessage>?[] handlers;
+            IAsyncMessageHandler<TMessage>[] handlers;
             lock (gate)
             {
                 if (!handlerGroup.TryGetValue(key, out var holder))
@@ -77,7 +80,11 @@ namespace MessagePipe
 
             for (int i = 0; i < handlers.Length; i++)
             {
+#if !UNITY_2018_3_OR_NEWER
                 handlers[i]?.HandleAsync(message, cancellationToken).Forget();
+#else
+                handlers[i]?.HandleAsync(message, cancellationToken).AsAsyncUnitUniTask().Forget();
+#endif
             }
         }
 
@@ -88,7 +95,7 @@ namespace MessagePipe
 
         public async UniTask PublishAsync(TKey key, TMessage message, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken)
         {
-            IAsyncMessageHandler<TMessage>?[] handlers;
+            IAsyncMessageHandler<TMessage>[] handlers;
             lock (gate)
             {
                 if (!handlerGroup.TryGetValue(key, out var holder))
@@ -156,7 +163,7 @@ namespace MessagePipe
                 this.core = core;
             }
 
-            public IAsyncMessageHandler<TMessage>?[] GetHandlers() => handlers.GetValues();
+            public IAsyncMessageHandler<TMessage>[] GetHandlers() => handlers.GetValues();
 
             public IDisposable Subscribe(TKey key, IAsyncMessageHandler<TMessage> handler)
             {
@@ -218,7 +225,7 @@ namespace MessagePipe
 
     [Preserve]
     public class SingletonAsyncMessageBroker<TKey, TMessage> : AsyncMessageBroker<TKey, TMessage>, ISingletonAsyncPublisher<TKey, TMessage>, ISingletonAsyncSubscriber<TKey, TMessage>
-        where TKey : notnull
+        
     {
         public SingletonAsyncMessageBroker(SingletonAsyncMessageBrokerCore<TKey, TMessage> core, FilterAttachedAsyncMessageHandlerFactory handlerFactory)
             : base(core, handlerFactory)
@@ -228,7 +235,7 @@ namespace MessagePipe
 
     [Preserve]
     public class SingletonAsyncMessageBrokerCore<TKey, TMessage> : AsyncMessageBrokerCore<TKey, TMessage>
-        where TKey : notnull
+        
     {
         public SingletonAsyncMessageBrokerCore(MessagePipeDiagnosticsInfo diagnotics, MessagePipeOptions options)
             : base(diagnotics, options)
@@ -238,7 +245,7 @@ namespace MessagePipe
 
     [Preserve]
     public class ScopedAsyncMessageBroker<TKey, TMessage> : AsyncMessageBroker<TKey, TMessage>, IScopedAsyncPublisher<TKey, TMessage>, IScopedAsyncSubscriber<TKey, TMessage>
-        where TKey : notnull
+        
     {
         public ScopedAsyncMessageBroker(ScopedAsyncMessageBrokerCore<TKey, TMessage> core, FilterAttachedAsyncMessageHandlerFactory handlerFactory)
             : base(core, handlerFactory)
@@ -248,7 +255,7 @@ namespace MessagePipe
 
     [Preserve]
     public class ScopedAsyncMessageBrokerCore<TKey, TMessage> : AsyncMessageBrokerCore<TKey, TMessage>
-        where TKey : notnull
+        
     {
         public ScopedAsyncMessageBrokerCore(MessagePipeDiagnosticsInfo diagnotics, MessagePipeOptions options)
             : base(diagnotics, options)

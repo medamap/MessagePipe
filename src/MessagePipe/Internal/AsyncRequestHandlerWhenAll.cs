@@ -8,7 +8,7 @@ namespace MessagePipe.Internal
     internal partial class AsyncRequestHandlerWhenAll<TRequest, TResponse> : ICriticalNotifyCompletion
     {
         int completedCount;
-        ExceptionDispatchInfo? exception;
+        ExceptionDispatchInfo exception;
         Action continuation = ContinuationSentinel.AvailableContinuation;
 
         readonly TResponse[] result;
@@ -28,7 +28,7 @@ namespace MessagePipe.Internal
                     }
                     else
                     {
-                        AwaiterNode.RegisterUnsafeOnCompleted(this, awaiter, i); // 引数の型 'Cysharp.Threading.Tasks.UniTask<TResponse>.Awaiter' はパラメーター型 'System.Runtime.CompilerServices.ValueTaskAwaiter<TResponse>' に割り当てることができません
+                        AwaiterNode.RegisterUnsafeOnCompleted(this, awaiter, i);
                         continue;
                     }
                 }

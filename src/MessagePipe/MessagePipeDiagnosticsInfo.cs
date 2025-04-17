@@ -24,7 +24,7 @@ namespace MessagePipe
         public StackTrace StackTrace { get; }
         public string Head { get; }
 
-        internal string formattedStackTrace = default!; // cache field for internal use(Unity Editor, etc...)
+        internal string formattedStackTrace = default; // cache field for internal use(Unity Editor, etc...)
 
         public StackTraceInfo(StackTrace stackTrace)
         {
@@ -47,7 +47,7 @@ namespace MessagePipe
                 {
                     if (displayFileNames && sf.GetILOffset() != -1)
                     {
-                        string? fileName = null;
+                        string fileName = null;
                         try
                         {
                             fileName = sf.GetFileName();

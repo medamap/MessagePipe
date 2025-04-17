@@ -1,10 +1,13 @@
-﻿using MessagePipe.Internal;
+﻿#if !UNITY_2018_3_OR_NEWER
+#define UNITY_2018_3_OR_NEWER
+#endif
+
+using MessagePipe.Internal;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
@@ -50,12 +53,12 @@ namespace MessagePipe
             this.defaultAsyncPublishStrategy = options.DefaultAsyncPublishStrategy;
         }
 
-        public ValueTask<TResponse[]> InvokeAllAsync(TRequest request, CancellationToken cancellationToken)
+        public UniTask<TResponse[]> InvokeAllAsync(TRequest request, CancellationToken cancellationToken)
         {
             return InvokeAllAsync(request, defaultAsyncPublishStrategy, cancellationToken);
         }
 
-        public async ValueTask<TResponse[]> InvokeAllAsync(TRequest request, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken)
+        public async UniTask<TResponse[]> InvokeAllAsync(TRequest request, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken)
         {
             if (publishStrategy == AsyncPublishStrategy.Sequential)
             {
@@ -87,7 +90,7 @@ namespace MessagePipe
         }
 #else
 
-        public async IAsyncEnumerable<TResponse> InvokeAllLazyAsync(TRequest request, [EnumeratorCancellation] CancellationToken cancellationToken)
+        public async IUniTaskAsyncEnumerable<TResponse> InvokeAllLazyAsync(TRequest request,  CancellationToken cancellationToken)
         {
             for (int i = 0; i < handlers.Length; i++)
             {
