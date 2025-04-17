@@ -71,7 +71,7 @@ namespace MessagePipe
                 {
                     #if MESSAGEPIPE_DEBUG
                     // 詳細なデバッグ情報を出力
-                    UnityEngine.Debug.Log(
+                    global::UnityEngine.Debug.Log(
                         $"[MessagePipe.AsyncMessageBroker_Key] Can't execute HandleAsync Because no handlers.\n" +
                         $"Key: {key} (Type: {typeof(TKey).FullName})\n" +
                         $"Message: {message} (Type: {message?.GetType().FullName ?? "null"})\n" +
@@ -83,7 +83,7 @@ namespace MessagePipe
                 handlers = holder.GetHandlers();
                 #if MESSAGEPIPE_DEBUG
                 // ハンドラー情報も出力
-                UnityEngine.Debug.Log(
+                global::UnityEngine.Debug.Log(
                     $"[MessagePipe.AsyncMessageBroker_Key] Found {handlers.Length} handlers for key: {key}\n" +
                     $"Message Type: {typeof(TMessage).FullName}"
                 );
@@ -95,13 +95,13 @@ namespace MessagePipe
                 if (handlers[i] == null)
                 {
                     #if MESSAGEPIPE_DEBUG
-                    UnityEngine.Debug.LogWarning($"[MessagePipe] Handler at index {i} is null");
+                    global::UnityEngine.Debug.LogWarning($"[MessagePipe] Handler at index {i} is null");
                     #endif
                     continue;
                 }
                 #if MESSAGEPIPE_DEBUG
                 // ハンドラー実行前にログ
-                UnityEngine.Debug.Log($"[MessagePipe] Executing handler {i} for key: {key}, message type: {typeof(TMessage).FullName}");
+                global::UnityEngine.Debug.Log($"[MessagePipe] Executing handler {i} for key: {key}, message type: {typeof(TMessage).FullName}");
                 #endif
                 handlers[i]?.HandleAsync(message, cancellationToken).Forget();
             }

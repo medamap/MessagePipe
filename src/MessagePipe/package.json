@@ -1,7 +1,7 @@
 {
   "name": "jp.megamin.messagepipe",
   "displayName": "MessagePipe (Extended)",
-  "version": "1.8.1-extended.54",
+  "version": "1.8.1-extended.55",
   "unity": "2018.4",
   "description": "High performance messaging pipeline.",
   "keywords": [
