@@ -18,5 +18,5 @@
       "define": "MESSAGEPIPE_OPENGENERICS_SUPPORT"
     }
   ],
-  "noEngineReferences": true
+  "noEngineReferences": false
 }
