@@ -64,7 +64,7 @@ namespace MessagePipe.Interprocess.Workers
             });
 #else
             // 同じメソッドを使うが、SingleReaderをtrueに設定して単一コンシューマを模倣
-            this.channel = Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions()
+            this.channel = Channel.CreateUnbounded<byte[]>(new System.Threading.Channels.UnboundedChannelOptions()
             {
                 SingleReader = true, // 単一コンシューマを指定
                 SingleWriter = false,

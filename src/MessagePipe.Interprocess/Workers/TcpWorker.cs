@@ -77,7 +77,7 @@ namespace MessagePipe.Interprocess.Workers
                 AllowSynchronousContinuations = true
             });
 #else
-            this.channel = Channel.CreateUnbounded<TcpMessageContainer>(new UnboundedChannelOptions()
+            this.channel = Channel.CreateUnbounded<TcpMessageContainer>(new System.Threading.Channels.UnboundedChannelOptions()
             {
                 SingleReader = true,
                 SingleWriter = false,
@@ -133,7 +133,7 @@ namespace MessagePipe.Interprocess.Workers
             });
 #else
             // 同じメソッドを使うが、SingleReaderをtrueに設定して単一コンシューマを模倣
-            this.channel = Channel.CreateUnbounded<TcpMessageContainer>(new UnboundedChannelOptions()
+            this.channel = Channel.CreateUnbounded<TcpMessageContainer>(new System.Threading.Channels.UnboundedChannelOptions()
             {
                 SingleReader = true,
                 SingleWriter = false,
