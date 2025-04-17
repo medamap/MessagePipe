@@ -28,7 +28,7 @@ namespace MessagePipe.Internal
                     }
                     else
                     {
-                        AwaiterNode.RegisterUnsafeOnCompleted(this, awaiter, i);
+                        AwaiterNode.RegisterUnsafeOnCompleted(this, awaiter, i); // 引数の型 'Cysharp.Threading.Tasks.UniTask<TResponse>.Awaiter' はパラメーター型 'System.Runtime.CompilerServices.ValueTaskAwaiter<TResponse>' に割り当てることができません
                         continue;
                     }
                 }

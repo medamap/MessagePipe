@@ -44,8 +44,9 @@ namespace MessagePipe.Interprocess
                     }
                     catch (Exception ex)
                     {
-                        // ロギング時のエラーは抑制
+                        #if UNITY_2018_3_OR_NEWER
                         UnityEngine.Debug.LogError("[LogThrottler] Error in logging action: " + ex.Message);
+                        #endif
                     }
                     
                     // リセット

@@ -2,6 +2,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe.Redis
 {
@@ -16,7 +17,7 @@ namespace MessagePipe.Redis
             this.serializer = serializer;
         }
 
-        public async ValueTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken)
+        public async UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken)
         {
             var channel = CreateChannel(key);
             var value = serializer.Serialize(message);
@@ -54,12 +55,12 @@ namespace MessagePipe.Redis
             this.asyncMessageHandlerFactory = asyncMessageHandlerFactory;
         }
 
-        public ValueTask<IAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, CancellationToken cancellationToken)
+        public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, CancellationToken cancellationToken)
         {
             return SubscribeAsync(key, handler, Array.Empty<MessageHandlerFilter<TMessage>>(), cancellationToken);
         }
 
-        public async ValueTask<IAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, MessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken)
+        public async UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, MessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken)
         {
             handler = messageHandlerFactory.CreateMessageHandler(handler, filters); // with filter
 
@@ -75,12 +76,12 @@ namespace MessagePipe.Redis
             return new Subscription(mq);
         }
 
-        public ValueTask<IAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, CancellationToken cancellationToken)
+        public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, CancellationToken cancellationToken)
         {
             return SubscribeAsync(key, handler, Array.Empty<AsyncMessageHandlerFilter<TMessage>>(), cancellationToken);
         }
 
-        public async ValueTask<IAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, AsyncMessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken)
+        public async UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, AsyncMessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken)
         {
             handler = asyncMessageHandlerFactory.CreateAsyncMessageHandler(handler, filters); // with filter
 
@@ -90,7 +91,7 @@ namespace MessagePipe.Redis
             mq.OnMessage(async message =>
             {
                 var v = serializer.Deserialize<TMessage>((byte[])message.Message);
-                await handler.HandleAsync(v, CancellationToken.None).ConfigureAwait(false);
+                await handler.HandleAsync(v, CancellationToken.None).AsValueTask().ConfigureAwait(false);
             });
 
             return new Subscription(mq);
@@ -109,7 +110,7 @@ namespace MessagePipe.Redis
             }
         }
 
-        sealed class Subscription : IAsyncDisposable
+        sealed class Subscription : IUniTaskAsyncDisposable
         {
             readonly ChannelMessageQueue mq;
 
@@ -118,7 +119,7 @@ namespace MessagePipe.Redis
                 this.mq = mq;
             }
 
-            public async ValueTask DisposeAsync()
+            public async UniTask DisposeAsync()
             {
                 await mq.UnsubscribeAsync();
             }

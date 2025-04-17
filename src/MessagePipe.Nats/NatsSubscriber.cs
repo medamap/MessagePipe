@@ -1,4 +1,5 @@
 ﻿using AlterNats;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe.Nats;
 
@@ -18,7 +19,7 @@ public sealed class NatsSubscriber<TKey, TMessage> : IDistributedSubscriber<TKey
         this.asyncMessageHandlerFactory = asyncMessageHandlerFactory;
     }
 
-    public ValueTask<IAsyncDisposable> SubscribeAsync(
+    public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(
         TKey key,
         IMessageHandler<TMessage> handler,
         CancellationToken cancellationToken = new())
@@ -26,7 +27,7 @@ public sealed class NatsSubscriber<TKey, TMessage> : IDistributedSubscriber<TKey
         return SubscribeAsync(key, handler, Array.Empty<MessageHandlerFilter<TMessage>>(), cancellationToken);
     }
 
-    public async ValueTask<IAsyncDisposable> SubscribeAsync(
+    public async UniTask<IUniTaskAsyncDisposable> SubscribeAsync(
         TKey key,
         IMessageHandler<TMessage> handler,
         MessageHandlerFilter<TMessage>[] filters,
@@ -48,7 +49,7 @@ public sealed class NatsSubscriber<TKey, TMessage> : IDistributedSubscriber<TKey
         return new Subscription(s);
     }
 
-    public ValueTask<IAsyncDisposable> SubscribeAsync(
+    public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(
         TKey key,
         IAsyncMessageHandler<TMessage> handler,
         CancellationToken cancellationToken = new())
@@ -56,7 +57,7 @@ public sealed class NatsSubscriber<TKey, TMessage> : IDistributedSubscriber<TKey
         return SubscribeAsync(key, handler, Array.Empty<AsyncMessageHandlerFilter<TMessage>>(), cancellationToken);
     }
 
-    public async ValueTask<IAsyncDisposable> SubscribeAsync(
+    public async UniTask<IUniTaskAsyncDisposable> SubscribeAsync(
         TKey key,
         IAsyncMessageHandler<TMessage> handler,
         AsyncMessageHandlerFilter<TMessage>[] filters,
@@ -68,17 +69,17 @@ public sealed class NatsSubscriber<TKey, TMessage> : IDistributedSubscriber<TKey
 
         handler = asyncMessageHandlerFactory.CreateAsyncMessageHandler(handler, filters); // with filter
 
-        var connection = await connectionFactory.GetConnectionAsync();
+        var connection = await connectionFactory.GetConnectionAsync().AsUniTask();
 
         var s = await connection.SubscribeAsync<TMessage>(subject, async data =>
         {
-            await handler.HandleAsync(data, CancellationToken.None).ConfigureAwait(false);
+            await handler.HandleAsync(data, CancellationToken.None).AsValueTask().ConfigureAwait(false);
         });
 
         return new Subscription(s);
     }
 
-    sealed class Subscription : IAsyncDisposable
+    sealed class Subscription : IUniTaskAsyncDisposable
     {
         readonly IDisposable disposable;
 
@@ -87,11 +88,11 @@ public sealed class NatsSubscriber<TKey, TMessage> : IDistributedSubscriber<TKey
             this.disposable = disposable;
         }
 
-        public ValueTask DisposeAsync()
+        public UniTask DisposeAsync()
         {
             disposable.Dispose();
 
-            return ValueTask.CompletedTask;
+            return UniTask.CompletedTask;
         }
     }
 

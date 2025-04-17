@@ -173,7 +173,7 @@ namespace MessagePipe.Interprocess
         }
     }
     
-    public sealed class MessagePipeInterprocessTcpUdsOptions : MessagePipeInterprocessOptions
+    public class MessagePipeInterprocessTcpUdsOptions : MessagePipeInterprocessOptions
     {
         public string SocketPath { get; set; }
         public int? SendBufferSize { get; set; }

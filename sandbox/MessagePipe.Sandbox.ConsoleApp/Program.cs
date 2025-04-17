@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using ZLogger;
 
 namespace MessagePipe
@@ -555,7 +556,7 @@ namespace MessagePipe
 
     public class DelayRequestFilter : AsyncRequestHandlerFilter<int, int>
     {
-        public override async ValueTask<int> InvokeAsync(int request, CancellationToken cancellationToken, Func<int, CancellationToken, ValueTask<int>> next)
+        public override async UniTask<int> InvokeAsync(int request, CancellationToken cancellationToken, Func<int, CancellationToken, UniTask<int>> next)
         {
             await Task.Delay(TimeSpan.FromSeconds(request));
             var response = await next(request, cancellationToken);
@@ -584,12 +585,12 @@ namespace MessagePipe
         IAsyncRequestHandler<Command1, Response1>,
         IAsyncRequestHandler<Command2, Response2>
     {
-        public ValueTask<Response1> InvokeAsync(Command1 request, CancellationToken cancellationToken = default)
+        public UniTask<Response1> InvokeAsync(Command1 request, CancellationToken cancellationToken = default)
         {
             return default;
         }
 
-        public ValueTask<Response2> InvokeAsync(Command2 request, CancellationToken cancellationToken = default)
+        public UniTask<Response2> InvokeAsync(Command2 request, CancellationToken cancellationToken = default)
         {
             return default;
         }

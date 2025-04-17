@@ -2,6 +2,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
 {
@@ -41,12 +42,12 @@ namespace MessagePipe
 
         // pubsub-keyless-async
 
-        public static IDisposable Subscribe<TMessage>(this IAsyncSubscriber<TMessage> subscriber, Func<TMessage, CancellationToken, ValueTask> handler, params AsyncMessageHandlerFilter<TMessage>[] filters)
+        public static IDisposable Subscribe<TMessage>(this IAsyncSubscriber<TMessage> subscriber, Func<TMessage, CancellationToken, UniTask> handler, params AsyncMessageHandlerFilter<TMessage>[] filters)
         {
             return subscriber.Subscribe(new AnonymousAsyncMessageHandler<TMessage>(handler), filters);
         }
 
-        public static IDisposable Subscribe<TMessage>(this IAsyncSubscriber<TMessage> subscriber, Func<TMessage, CancellationToken, ValueTask> handler, Func<TMessage, bool> predicate, params AsyncMessageHandlerFilter<TMessage>[] filters)
+        public static IDisposable Subscribe<TMessage>(this IAsyncSubscriber<TMessage> subscriber, Func<TMessage, CancellationToken, UniTask> handler, Func<TMessage, bool> predicate, params AsyncMessageHandlerFilter<TMessage>[] filters)
         {
             var predicateFilter = new AsyncPredicateFilter<TMessage>(predicate);
             filters = (filters.Length == 0)
@@ -56,22 +57,22 @@ namespace MessagePipe
             return subscriber.Subscribe(new AnonymousAsyncMessageHandler<TMessage>(handler), filters);
         }
 
-        public static ValueTask<IDisposable> SubscribeAsync<TMessage>(this IBufferedAsyncSubscriber<TMessage> subscriber, Func<TMessage, CancellationToken, ValueTask> handler, CancellationToken cancellationToken = default)
+        public static ValueTask<IDisposable> SubscribeAsync<TMessage>(this IBufferedAsyncSubscriber<TMessage> subscriber, Func<TMessage, CancellationToken, UniTask> handler, CancellationToken cancellationToken = default)
         {
             return SubscribeAsync(subscriber, handler, Array.Empty<AsyncMessageHandlerFilter<TMessage>>(), cancellationToken);
         }
 
-        public static ValueTask<IDisposable> SubscribeAsync<TMessage>(this IBufferedAsyncSubscriber<TMessage> subscriber, Func<TMessage, CancellationToken, ValueTask> handler, AsyncMessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
+        public static ValueTask<IDisposable> SubscribeAsync<TMessage>(this IBufferedAsyncSubscriber<TMessage> subscriber, Func<TMessage, CancellationToken, UniTask> handler, AsyncMessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
         {
             return subscriber.SubscribeAsync(new AnonymousAsyncMessageHandler<TMessage>(handler), filters, cancellationToken);
         }
 
-        public static ValueTask<IDisposable> SubscribeAsync<TMessage>(this IBufferedAsyncSubscriber<TMessage> subscriber, Func<TMessage, CancellationToken, ValueTask> handler, Func<TMessage, bool> predicate, CancellationToken cancellationToken = default)
+        public static ValueTask<IDisposable> SubscribeAsync<TMessage>(this IBufferedAsyncSubscriber<TMessage> subscriber, Func<TMessage, CancellationToken, UniTask> handler, Func<TMessage, bool> predicate, CancellationToken cancellationToken = default)
         {
             return SubscribeAsync(subscriber, handler, predicate, Array.Empty<AsyncMessageHandlerFilter<TMessage>>(), cancellationToken);
         }
 
-        public static ValueTask<IDisposable> SubscribeAsync<TMessage>(this IBufferedAsyncSubscriber<TMessage> subscriber, Func<TMessage, CancellationToken, ValueTask> handler, Func<TMessage, bool> predicate, AsyncMessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
+        public static ValueTask<IDisposable> SubscribeAsync<TMessage>(this IBufferedAsyncSubscriber<TMessage> subscriber, Func<TMessage, CancellationToken, UniTask> handler, Func<TMessage, bool> predicate, AsyncMessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
         {
             var predicateFilter = new AsyncPredicateFilter<TMessage>(predicate);
             filters = (filters.Length == 0)
@@ -102,13 +103,13 @@ namespace MessagePipe
 
         // pubsub-key-async
 
-        public static IDisposable Subscribe<TKey, TMessage>(this IAsyncSubscriber<TKey, TMessage> subscriber, TKey key, Func<TMessage, CancellationToken, ValueTask> handler, params AsyncMessageHandlerFilter<TMessage>[] filters)
+        public static IDisposable Subscribe<TKey, TMessage>(this IAsyncSubscriber<TKey, TMessage> subscriber, TKey key, Func<TMessage, CancellationToken, UniTask> handler, params AsyncMessageHandlerFilter<TMessage>[] filters)
             where TKey : notnull
         {
             return subscriber.Subscribe(key, new AnonymousAsyncMessageHandler<TMessage>(handler), filters);
         }
 
-        public static IDisposable Subscribe<TKey, TMessage>(this IAsyncSubscriber<TKey, TMessage> subscriber, TKey key, Func<TMessage, CancellationToken, ValueTask> handler, Func<TMessage, bool> predicate, params AsyncMessageHandlerFilter<TMessage>[] filters)
+        public static IDisposable Subscribe<TKey, TMessage>(this IAsyncSubscriber<TKey, TMessage> subscriber, TKey key, Func<TMessage, CancellationToken, UniTask> handler, Func<TMessage, bool> predicate, params AsyncMessageHandlerFilter<TMessage>[] filters)
             where TKey : notnull
         {
             var predicateFilter = new AsyncPredicateFilter<TMessage>(predicate);
@@ -137,14 +138,14 @@ namespace MessagePipe
 
     internal sealed class AnonymousAsyncMessageHandler<TMessage> : IAsyncMessageHandler<TMessage>
     {
-        readonly Func<TMessage, CancellationToken, ValueTask> handler;
+        readonly Func<TMessage, CancellationToken, UniTask> handler;
 
-        public AnonymousAsyncMessageHandler(Func<TMessage, CancellationToken, ValueTask> handler)
+        public AnonymousAsyncMessageHandler(Func<TMessage, CancellationToken, UniTask> handler)
         {
             this.handler = handler;
         }
 
-        public ValueTask HandleAsync(TMessage message, CancellationToken cancellationToken)
+        public UniTask HandleAsync(TMessage message, CancellationToken cancellationToken)
         {
             return handler.Invoke(message, cancellationToken);
         }

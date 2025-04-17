@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -195,7 +196,7 @@ namespace MessagePipe.Interprocess.Tests
 
     public class MyAsyncHandler : IAsyncRequestHandler<int, string>
     {
-        public async ValueTask<string> InvokeAsync(int request, CancellationToken cancellationToken = default)
+        public async UniTask<string> InvokeAsync(int request, CancellationToken cancellationToken = default)
         {
             await Task.Delay(1);
             if (request == -1)

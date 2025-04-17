@@ -9,6 +9,7 @@ using MessagePipe;
 using MessagePipe.Tests;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading;
+using Cysharp.Threading.Tasks;
 
 namespace __MessagePipe.Tests
 {
@@ -33,7 +34,7 @@ namespace __MessagePipe.Tests
         class AsyncPingPongHandlerFilter : AsyncRequestHandlerFilter<Ping, Pong>
         {
 
-            public override async ValueTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken, Func<Ping, CancellationToken, ValueTask<Pong>> next)
+            public override async UniTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken, Func<Ping, CancellationToken, UniTask<Pong>> next)
             {
                 if (request.Value == null)
                 {
@@ -65,9 +66,9 @@ namespace __MessagePipe.Tests
         [AsyncRequestHandlerFilter(typeof(AsyncPingPongHandlerFilter))]
         class AsyncPingPongHandler : IAsyncRequestHandler<Ping, Pong>
         {
-            public ValueTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken = default)
+            public UniTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken = default)
             {
-                return ValueTask.FromResult(new Pong(request.Value));
+                return UniTask.FromResult(new Pong(request.Value));
             }
         }
     }

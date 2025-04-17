@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Xunit;
 
 // for check diagnostics, modify namespace.
@@ -74,19 +75,19 @@ namespace __MessagePipe.Tests
 
         class AsyncPingPongHandler : IAsyncRequestHandler<Ping, Pong>
         {
-            public ValueTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken = default)
+            public UniTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken = default)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return ValueTask.FromResult(new Pong(request.AnyValue));
+                return UniTask.FromResult(new Pong(request.AnyValue));
             }
         }
 
         class AsyncPingPongTwiceHandler : IAsyncRequestHandler<Ping, Pong>
         {
-            public ValueTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken = default)
+            public UniTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken = default)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return ValueTask.FromResult(new Pong(request.AnyValue + request.AnyValue));
+                return UniTask.FromResult(new Pong(request.AnyValue + request.AnyValue));
             }
         }
     }

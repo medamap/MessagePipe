@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
 {
@@ -25,12 +26,12 @@ namespace MessagePipe
             core.Publish(key, message, cancellationToken);
         }
 
-        public ValueTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken)
+        public UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken)
         {
             return core.PublishAsync(key, message, cancellationToken);
         }
 
-        public ValueTask PublishAsync(TKey key, TMessage message, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken)
+        public UniTask PublishAsync(TKey key, TMessage message, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken)
         {
             return core.PublishAsync(key, message, publishStrategy, cancellationToken);
         }
@@ -80,12 +81,12 @@ namespace MessagePipe
             }
         }
 
-        public ValueTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken)
+        public UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken)
         {
             return PublishAsync(key, message, defaultAsyncPublishStrategy, cancellationToken);
         }
 
-        public async ValueTask PublishAsync(TKey key, TMessage message, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken)
+        public async UniTask PublishAsync(TKey key, TMessage message, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken)
         {
             IAsyncMessageHandler<TMessage>?[] handlers;
             lock (gate)

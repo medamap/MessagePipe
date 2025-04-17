@@ -3,6 +3,7 @@ using MessagePipe.Internal;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
 {
@@ -390,7 +391,7 @@ namespace MessagePipe
             self.core.SetException(new OperationCanceledException(self.cancellationToken));
         }
 
-        public ValueTask HandleAsync(TMessage message, CancellationToken cancellationToken)
+        public UniTask HandleAsync(TMessage message, CancellationToken cancellationToken)
         {
             if (Interlocked.Increment(ref handleCalled) == 1)
             {
@@ -478,7 +479,7 @@ namespace MessagePipe
             self.core.SetException(new OperationCanceledException(self.cancellationToken));
         }
 
-        public ValueTask HandleAsync(TMessage message, CancellationToken cancellationToken)
+        public UniTask HandleAsync(TMessage message, CancellationToken cancellationToken)
         {
             if (Interlocked.Increment(ref handleCalled) == 1)
             {
@@ -568,7 +569,7 @@ namespace MessagePipe
             self.core.SetException(new OperationCanceledException(self.cancellationToken));
         }
 
-        public ValueTask HandleAsync(TMessage message, CancellationToken cancellationToken)
+        public UniTask HandleAsync(TMessage message, CancellationToken cancellationToken)
         {
             if (Interlocked.Increment(ref handleCalled) == 1)
             {

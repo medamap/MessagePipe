@@ -1,4 +1,5 @@
 ﻿using AlterNats;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe.Nats;
 
@@ -12,7 +13,7 @@ public sealed class NatsPublisher<TKey, TMessage> : IDistributedPublisher<TKey, 
         this.connectionFactory = connectionFactory;
     }
 
-    public async ValueTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = new CancellationToken())
+    public async UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = new CancellationToken())
     {
         var natsKey = GetNatsKey(key);
 

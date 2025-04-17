@@ -2,6 +2,8 @@ using System;
 using MessagePack;
 using MessagePack.Resolvers;
 
+// ReSharper disable ClassNeverInstantiated.Global
+
 namespace MessagePipe.Interprocess
 {
     ///  summary 

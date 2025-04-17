@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Xunit;
 
 namespace MessagePipe.Tests
@@ -197,7 +198,7 @@ namespace MessagePipe.Tests
     {
         public List<int> Capture { get; set; } = new List<int>();
 
-        public override ValueTask HandleAsync(IntClass message, CancellationToken cancellationToken, Func<IntClass, CancellationToken, ValueTask> next)
+        public override UniTask HandleAsync(IntClass message, CancellationToken cancellationToken, Func<IntClass, CancellationToken, UniTask> next)
         {
             Capture.Add(message.Value);
             return next(message, cancellationToken);

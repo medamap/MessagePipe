@@ -9,6 +9,7 @@ using MessagePipe;
 using MessagePipe.Tests;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading;
+using Cysharp.Threading.Tasks;
 
 namespace __MessagePipe.Tests
 {
@@ -40,7 +41,7 @@ namespace __MessagePipe.Tests
 
         public class PingPongHandlerAsyncFilter : AsyncRequestHandlerFilter<Ping, Pong>
         {
-            public override async ValueTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken, Func<Ping, CancellationToken, ValueTask<Pong>> next)
+            public override async UniTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken, Func<Ping, CancellationToken, UniTask<Pong>> next)
             {
                 if (request.AnyValue == null)
                 {
@@ -52,7 +53,7 @@ namespace __MessagePipe.Tests
         }
         public class PingPongHandlerAsyncFilter2 : AsyncRequestHandlerFilter<Ping, Pong>
         {
-            public override async ValueTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken, Func<Ping, CancellationToken, ValueTask<Pong>> next)
+            public override async UniTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken, Func<Ping, CancellationToken, UniTask<Pong>> next)
             {
                 if (request.AnyValue == null)
                 {
@@ -83,20 +84,20 @@ namespace __MessagePipe.Tests
         [AsyncRequestHandlerFilter(typeof(PingPongHandlerAsyncFilter))]
         class AsyncPingPongHandler : IAsyncRequestHandler<Ping, Pong>
         {
-            public ValueTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken = default)
+            public UniTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken = default)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return ValueTask.FromResult(new Pong(request.AnyValue));
+                return UniTask.FromResult(new Pong(request.AnyValue));
             }
         }
 
         [AsyncRequestHandlerFilter(typeof(PingPongHandlerAsyncFilter2))]
         class AsyncPingPongHandler2 : IAsyncRequestHandler<Ping, Pong>
         {
-            public ValueTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken = default)
+            public UniTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken = default)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return ValueTask.FromResult(new Pong(request.AnyValue + request.AnyValue));
+                return UniTask.FromResult(new Pong(request.AnyValue + request.AnyValue));
             }
         }
     }

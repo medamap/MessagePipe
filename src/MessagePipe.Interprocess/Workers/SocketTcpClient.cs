@@ -187,7 +187,9 @@ namespace MessagePipe.Interprocess.Workers
             }
             catch (Exception ex)
             {
+                #if UNITY_2018_3_OR_NEWER
                 UnityEngine.Debug.LogError($"[TCP DEBUG] ConnectWithLocalEndpoint error: {ex.Message}\n{ex.StackTrace}");
+                #endif
                 throw;
             }
         }
@@ -209,7 +211,9 @@ namespace MessagePipe.Interprocess.Workers
             }
             catch (Exception ex)
             {
+                #if UNITY_2018_3_OR_NEWER
                 UnityEngine.Debug.LogError($"[TCP DEBUG] ConnectUds error: {ex.Message}\n{ex.StackTrace}");
+                #endif
                 throw;
             }
         }
@@ -245,7 +249,7 @@ namespace MessagePipe.Interprocess.Workers
         public UniTask<int> SendAsync(byte[] buffer, CancellationToken cancellationToken = default)
         {
 #if NET5_0_OR_GREATER
-            return socket.SendAsync(buffer, SocketFlags.None, cancellationToken);
+            return socket.SendAsync(buffer, SocketFlags.None, cancellationToken).AsUniTask();
 #else
             var tcs = new UniTaskCompletionSource<int>();
             socket.BeginSend(buffer, 0, buffer.Length, SocketFlags.None, x =>
@@ -264,7 +268,7 @@ namespace MessagePipe.Interprocess.Workers
              }, null);
 
 #if !UNITY_2018_3_OR_NEWER
-            return new UniTask<int>(tcs.Task);
+            return tcs.Task;
 #else
             return tcs.Task;
 #endif

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 namespace InterprocessServer
 {
@@ -65,7 +66,7 @@ namespace InterprocessServer
 
     public class MyAsyncHandler : IAsyncRequestHandler<int, string>
     {
-        public async ValueTask<string> InvokeAsync(int request, CancellationToken cancellationToken = default)
+        public async UniTask<string> InvokeAsync(int request, CancellationToken cancellationToken = default)
         {
             await Task.Delay(1);
             return "ECHO:" + request.ToString();

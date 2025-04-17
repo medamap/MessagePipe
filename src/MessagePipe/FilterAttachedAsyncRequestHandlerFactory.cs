@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
 {
@@ -42,11 +43,11 @@ namespace MessagePipe
 
     internal sealed class FilterAttachedAsyncRequestHandler<TRequest, TResponse> : IAsyncRequestHandler<TRequest, TResponse>
     {
-        Func<TRequest, CancellationToken, ValueTask<TResponse>> handler;
+        Func<TRequest, CancellationToken, UniTask<TResponse>> handler;
 
         public FilterAttachedAsyncRequestHandler(IAsyncRequestHandlerCore<TRequest, TResponse> body, IEnumerable<AsyncRequestHandlerFilter<TRequest, TResponse>> filters)
         {
-            Func<TRequest, CancellationToken, ValueTask<TResponse>> next = body.InvokeAsync;
+            Func<TRequest, CancellationToken, UniTask<TResponse>> next = body.InvokeAsync;
             foreach (var f in filters.OrderByDescending(x => x.Order))
             {
                 next = new AsyncRequestHandlerFilterRunner<TRequest, TResponse>(f, next).GetDelegate();
@@ -55,7 +56,7 @@ namespace MessagePipe
             this.handler = next;
         }
 
-        public ValueTask<TResponse> InvokeAsync(TRequest request, CancellationToken cancellationToken)
+        public UniTask<TResponse> InvokeAsync(TRequest request, CancellationToken cancellationToken)
         {
             return handler(request, cancellationToken);
         }
@@ -64,18 +65,18 @@ namespace MessagePipe
     internal sealed class AsyncRequestHandlerFilterRunner<TRequest, TResponse>
     {
         readonly AsyncRequestHandlerFilter<TRequest, TResponse> filter;
-        readonly Func<TRequest, CancellationToken, ValueTask<TResponse>> next;
+        readonly Func<TRequest, CancellationToken, UniTask<TResponse>> next;
 
-        public AsyncRequestHandlerFilterRunner(AsyncRequestHandlerFilter<TRequest, TResponse> filter, Func<TRequest, CancellationToken, ValueTask<TResponse>> next)
+        public AsyncRequestHandlerFilterRunner(AsyncRequestHandlerFilter<TRequest, TResponse> filter, Func<TRequest, CancellationToken, UniTask<TResponse>> next)
         {
             this.filter = filter;
             this.next = next;
         }
 
-        public Func<TRequest, CancellationToken, ValueTask<TResponse>> GetDelegate() => InvokeAsync;
+        public Func<TRequest, CancellationToken, UniTask<TResponse>> GetDelegate() => InvokeAsync;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        ValueTask<TResponse> InvokeAsync(TRequest request, CancellationToken cancellationToken)
+        UniTask<TResponse> InvokeAsync(TRequest request, CancellationToken cancellationToken)
         {
             return filter.InvokeAsync(request, cancellationToken, next);
         }

@@ -11,6 +11,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Channel = System.Threading.Channels.Channel;
 
 namespace MessagePipe.Interprocess.Workers
 {
@@ -25,7 +26,7 @@ namespace MessagePipe.Interprocess.Workers
         // Channel is used from publisher for thread safety of write packet
         int initializedServer = 0;
         Lazy<SocketTcpServer> server;
-        Channel<TcpMessageContainer> channel;
+        System.Threading.Channels.Channel<TcpMessageContainer> channel;
 
         int initializedClient = 0;
         Lazy<SocketTcpClient> client;
@@ -61,7 +62,9 @@ namespace MessagePipe.Interprocess.Workers
                 }
                 catch (Exception ex)
                 {
+                    #if UNITY_2018_3_OR_NEWER
                     UnityEngine.Debug.LogError($"[TCP DEBUG] Client initialization failed: {ex.Message}\n{ex.StackTrace}");
+                    #endif
                     throw;
                 }
             });
@@ -109,7 +112,9 @@ namespace MessagePipe.Interprocess.Workers
                 }
                 catch (Exception ex)
                 {
+                    #if UNITY_2018_3_OR_NEWER
                     UnityEngine.Debug.LogError($"[TCP DEBUG] Client initialization failed: {ex.Message}\n{ex.StackTrace}");
+                    #endif
                     throw;
                 }
             });

@@ -13,6 +13,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Channel = System.Threading.Channels.Channel;
 
 namespace MessagePipe.Interprocess.Workers
 {
@@ -28,7 +29,7 @@ namespace MessagePipe.Interprocess.Workers
         // Channel is used from publisher for thread safety of write packet
         int initializedServer = 0;
         Lazy<NamedPipeServerStream> server;
-        Channel<byte[]> channel;
+        System.Threading.Channels.Channel<byte[]> channel;
 
         int initializedClient = 0;
         Lazy<NamedPipeClientStream> client;

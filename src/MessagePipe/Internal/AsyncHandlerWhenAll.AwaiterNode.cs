@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe.Internal
 {
@@ -12,7 +13,7 @@ namespace MessagePipe.Internal
             public ref AwaiterNode? NextNode => ref nextNode;
 
             AsyncHandlerWhenAll<T> parent = default!;
-            ValueTaskAwaiter awaiter;
+            UniTask.Awaiter awaiter;
 
             readonly Action continuation;
 
@@ -23,7 +24,7 @@ namespace MessagePipe.Internal
                 this.continuation = OnCompleted;
             }
 
-            public static void RegisterUnsafeOnCompleted(AsyncHandlerWhenAll<T> parent, ValueTaskAwaiter awaiter)
+            public static void RegisterUnsafeOnCompleted(AsyncHandlerWhenAll<T> parent, UniTask.Awaiter awaiter)
             {
                 if (!pool.TryPop(out var result))
                 {

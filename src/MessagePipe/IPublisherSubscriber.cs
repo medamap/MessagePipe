@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
 {
@@ -13,7 +14,7 @@ namespace MessagePipe
 
     public interface IAsyncMessageHandler<TMessage>
     {
-        ValueTask HandleAsync(TMessage message, CancellationToken cancellationToken);
+        UniTask HandleAsync(TMessage message, CancellationToken cancellationToken);
     }
 
     // Keyless
@@ -67,8 +68,8 @@ namespace MessagePipe
         where TKey : notnull
     {
         void Publish(TKey key, TMessage message, CancellationToken cancellationToken = default(CancellationToken));
-        ValueTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = default(CancellationToken));
-        ValueTask PublishAsync(TKey key, TMessage message, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken = default(CancellationToken));
+        UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = default(CancellationToken));
+        UniTask PublishAsync(TKey key, TMessage message, AsyncPublishStrategy publishStrategy, CancellationToken cancellationToken = default(CancellationToken));
     }
 
     public interface IAsyncSubscriber<TKey, TMessage>

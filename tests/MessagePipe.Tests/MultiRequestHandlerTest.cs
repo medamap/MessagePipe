@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Xunit;
 
 // for check diagnostics, modify namespace.
@@ -72,14 +73,14 @@ namespace __MessagePipe.Tests
                 return new Response2(request);
             }
 
-            public ValueTask<Response1> InvokeAsync(Request1 request, CancellationToken cancellationToken = default)
+            public UniTask<Response1> InvokeAsync(Request1 request, CancellationToken cancellationToken = default)
             {
-                return ValueTask.FromResult(new Response1(request));
+                return UniTask.FromResult(new Response1(request));
             }
 
-            public ValueTask<Response2> InvokeAsync(Request2 request, CancellationToken cancellationToken = default)
+            public UniTask<Response2> InvokeAsync(Request2 request, CancellationToken cancellationToken = default)
             {
-                return ValueTask.FromResult(new Response2(request));
+                return UniTask.FromResult(new Response2(request));
             }
         }
 

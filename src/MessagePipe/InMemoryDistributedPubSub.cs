@@ -3,6 +3,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
 {
@@ -18,7 +19,7 @@ namespace MessagePipe
             this.publisher = publisher;
         }
 
-        public ValueTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = default)
+        public UniTask PublishAsync(TKey key, TMessage message, CancellationToken cancellationToken = default)
         {
             return publisher.PublishAsync(key, message, cancellationToken);
         }
@@ -36,33 +37,33 @@ namespace MessagePipe
             this.subscriber = subscriber;
         }
 
-        public ValueTask<IAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, CancellationToken cancellationToken = default)
+        public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, CancellationToken cancellationToken = default)
         {
             var d = subscriber.Subscribe(key, new AsyncMessageHandlerBridge<TMessage>(handler));
-            return new ValueTask<IAsyncDisposable>(new AsyncDisposableBridge(d));
+            return new UniTask<IUniTaskAsyncDisposable>(new AsyncDisposableBridge(d));
         }
 
-        public ValueTask<IAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, MessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
+        public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, MessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
         {
             var d = subscriber.Subscribe(key, new AsyncMessageHandlerBridge<TMessage>(handler), filters.Select(x => new AsyncMessageHandlerFilterBridge<TMessage>(x)).ToArray());
-            return new ValueTask<IAsyncDisposable>(new AsyncDisposableBridge(d));
+            return new UniTask<IUniTaskAsyncDisposable>(new AsyncDisposableBridge(d));
         }
 
-        public ValueTask<IAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, CancellationToken cancellationToken = default)
+        public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, CancellationToken cancellationToken = default)
         {
             var d = subscriber.Subscribe(key, handler);
-            return new ValueTask<IAsyncDisposable>(new AsyncDisposableBridge(d));
+            return new UniTask<IUniTaskAsyncDisposable>(new AsyncDisposableBridge(d));
         }
 
-        public ValueTask<IAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, AsyncMessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
+        public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, AsyncMessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
         {
 
             var d = subscriber.Subscribe(key, handler, filters);
-            return new ValueTask<IAsyncDisposable>(new AsyncDisposableBridge(d));
+            return new UniTask<IUniTaskAsyncDisposable>(new AsyncDisposableBridge(d));
         }
     }
 
-    internal sealed class AsyncDisposableBridge : IAsyncDisposable
+    internal sealed class AsyncDisposableBridge : IUniTaskAsyncDisposable
     {
         readonly IDisposable disposable;
 
@@ -71,7 +72,7 @@ namespace MessagePipe
             this.disposable = disposable;
         }
 
-        public ValueTask DisposeAsync()
+        public UniTask DisposeAsync()
         {
             disposable.Dispose();
             return default;
@@ -87,7 +88,7 @@ namespace MessagePipe
             this.handler = handler;
         }
 
-        public ValueTask HandleAsync(T message, CancellationToken cancellationToken)
+        public UniTask HandleAsync(T message, CancellationToken cancellationToken)
         {
             handler.Handle(message);
             return default;
@@ -104,7 +105,7 @@ namespace MessagePipe
             this.Order = filter.Order;
         }
 
-        public override ValueTask HandleAsync(T message, CancellationToken cancellationToken, Func<T, CancellationToken, ValueTask> next)
+        public override UniTask HandleAsync(T message, CancellationToken cancellationToken, Func<T, CancellationToken, UniTask> next)
         {
             filter.Handle(message, x => next(x, cancellationToken));
             return default;

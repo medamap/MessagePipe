@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
 {
@@ -21,7 +22,7 @@ namespace MessagePipe
             this.handler = handlerFactory.CreateAsyncRequestHandler<TRequest, TResponse>(handler);
         }
 
-        public ValueTask<TResponse> InvokeAsync(TRequest request, CancellationToken cancellationToken = default)
+        public UniTask<TResponse> InvokeAsync(TRequest request, CancellationToken cancellationToken = default)
         {
             return handler.InvokeAsync(request, cancellationToken);
         }

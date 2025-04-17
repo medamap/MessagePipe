@@ -14,6 +14,7 @@ using System.Reactive.Subjects;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Zenject;
 using Microsoft.Toolkit.Mvvm.Messaging;
 
@@ -169,7 +170,7 @@ namespace MessagePipe.Benchmark
                 actionDelegate[i] = new PlainAction().DelegateAction;
                 interfaceArray[i] = new PlainAction();
 
-                asyncS.Subscribe((_, _) => default(ValueTask));
+                asyncS.Subscribe((_, _) => default(UniTask));
 
                 toolkitStrong.Register<Message>(new object(), lambdaRef2.Delegate);
                 toolkitWeak.Register<Message>(new object(), lambdaRef2.Delegate);

@@ -225,7 +225,11 @@ namespace MessagePipe.Interprocess
             {
                 try
                 {
+                    #if UNITY_2018_3_OR_NEWER
                     await UniTask.Delay(_cleanupInterval, cancellationToken: token);
+                    #else
+                    await Task.Delay(_cleanupInterval, cancellationToken: token);
+                    #endif
                     CleanupIdleConnections();
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested)

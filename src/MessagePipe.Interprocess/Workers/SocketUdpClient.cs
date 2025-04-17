@@ -534,33 +534,36 @@ namespace MessagePipe.Interprocess.Workers
             var startTime = DateTime.UtcNow;
             LogThrottler.ThrottledLog(
                 "SocketUdpClient.SendToEndpoint" + endpoint.ToString(),
-                count => UnityEngine.Debug.Log("[SocketUdpClient] Starting send operation (" + count + " operations to this endpoint)"),
+                count => UnityEngine.Debug.Log($"[SocketUdpClient] Starting send operation ({count} operations to this endpoint)"),
                 200, 5000);
             #endif
             
         #if NET5_0_OR_GREATER
             try
             {
-                var result = socket.SendToAsync(data, SocketFlags.None, endpoint, cancellationToken);
-                
+                var segment = new ArraySegment<byte>(data);
+                var valueTask = socket.SendToAsync(segment, SocketFlags.None, endpoint);
+                var uniTask = valueTask.AsUniTask();
+        
                 #if MESSAGEPIPE_UDP_DEBUG
-                result.ContinueWith(bytesSent => 
+                // デバッグログはUniTaskの連鎖として実装
+                return uniTask.ContinueWith(bytesSent => 
                 {
                     var elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
                     LogThrottler.ThrottledLog(
                         "SocketUdpClient.SendComplete" + endpoint.ToString(),
-                        count => UnityEngine.Debug.Log("[SocketUdpClient] Sent data successfully (" + count + " sends, avg time: " + elapsed + "ms)"),
+                        count => UnityEngine.Debug.Log($"[SocketUdpClient] Sent data successfully ({count} sends, avg time: {elapsed} ms)"),
                         100, 2000);
                     return bytesSent;
                 });
+                #else
+                return uniTask;
                 #endif
-                
-                return result;
             }
             catch (Exception ex)
             {
                 #if MESSAGEPIPE_UDP_DEBUG
-                UnityEngine.Debug.LogError("[SocketUdpClient] Error during send to " + endpoint + ": " + ex.Message);
+                UnityEngine.Debug.LogError($"[SocketUdpClient] Error during send to {endpoint}: {ex.Message}");
                 #endif
                 throw;
             }
@@ -605,7 +608,7 @@ namespace MessagePipe.Interprocess.Workers
             }
             
         #if !UNITY_2018_3_OR_NEWER
-            return new UniTask<int>(tcs.Task);
+            return tcs.Task;
         #else
             return tcs.Task;
         #endif

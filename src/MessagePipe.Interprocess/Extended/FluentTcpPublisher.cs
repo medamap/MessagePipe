@@ -305,7 +305,11 @@ namespace MessagePipe.Interprocess
                     #endif
                     
                     container.State = TcpMessageState.Retrying;
+                    #if UNITY_2018_1_OR_NEWER
                     await UniTask.Delay(_retryInterval, cancellationToken: cancellationToken);
+                    #else
+                    await Task.Delay(_retryInterval, cancellationToken);
+                    #endif
                 }
             }
             

@@ -4,19 +4,20 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe.Interprocess.Benchmark
 {
     public class MyAsyncMessageHandler : IAsyncMessageHandler<byte[]>
     {
-        public ValueTask HandleAsync(byte[] message, CancellationToken cancellationToken)
+        public UniTask HandleAsync(byte[] message, CancellationToken cancellationToken)
         {
-            return default(ValueTask);
+            return default(UniTask);
         }
     }
     public class MyAsyncHandler : IAsyncRequestHandler<int, byte[]>
     {
-        public ValueTask<byte[]> InvokeAsync(int request, CancellationToken cancellationToken = default)
+        public UniTask<byte[]> InvokeAsync(int request, CancellationToken cancellationToken = default)
         {
             if (request == -1)
             {
@@ -24,7 +25,7 @@ namespace MessagePipe.Interprocess.Benchmark
             }
             else
             {
-                return new ValueTask<byte[]>(new byte[request]);
+                return new UniTask<byte[]>(new byte[request]);
             }
         }
     }

@@ -673,9 +673,9 @@ namespace MessagePipe.Interprocess.Workers
                     // メッセージの内部プロパティもチェック
                     if (message.KeyMemory.IsEmpty || message.ValueMemory.IsEmpty)
                     {
-#if MESSAGEPIPE_UDP_DEBUG
+                        #if MESSAGEPIPE_UDP_DEBUG
                         UnityEngine.Debug.LogWarning("[UdpWorker] Message contains empty data, skipping publish");
-#endif
+                        #endif
                         continue;
                     }
 

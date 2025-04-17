@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Xunit;
 
 // for check diagnostics, modify namespace.
@@ -16,7 +17,7 @@ namespace __MessagePipe.Tests
     {
 
         [Fact]
-        public async Task TestAsyncHandling()
+        public async UniTask TestAsyncHandling()
         {
             var provider = TestHelper.BuildServiceProvider();
             var pingHandler = provider.GetRequiredService<IAsyncRequestHandler<Ping, Pong>>();
@@ -35,7 +36,7 @@ namespace __MessagePipe.Tests
             var token = source.Token;
 
             source.Cancel();
-            pingHandler.Awaiting(x => x.InvokeAsync(new Ping("hoge"), token)).Should().ThrowAsync<OperationCanceledException>();
+            pingHandler.Awaiting(x => x.InvokeAsync(new Ping("hoge"), token).AsTask()).Should().ThrowAsync<OperationCanceledException>();
 
         }
 
@@ -60,10 +61,10 @@ namespace __MessagePipe.Tests
 
         class AsyncPingPongHandler : IAsyncRequestHandler<Ping, Pong>
         {
-            public ValueTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken = default)
+            public UniTask<Pong> InvokeAsync(Ping request, CancellationToken cancellationToken = default)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return ValueTask.FromResult(new Pong(request.AnyValue + request.AnyValue));
+                return UniTask.FromResult(new Pong(request.AnyValue + request.AnyValue));
             }
         }
     }

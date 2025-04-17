@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe.Sandbox.ConsoleApp
 {
@@ -74,7 +75,7 @@ namespace MessagePipe.Sandbox.ConsoleApp
             this.delaySpan = delaySpan;
         }
 
-        public override async ValueTask HandleAsync(T message, CancellationToken cancellationToken, Func<T, CancellationToken, ValueTask> next)
+        public override async UniTask HandleAsync(T message, CancellationToken cancellationToken, Func<T, CancellationToken, UniTask> next)
         {
             await Task.Delay(delaySpan, cancellationToken);
             await next(message, cancellationToken);

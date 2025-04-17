@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 namespace MessagePipe
 {
@@ -36,7 +37,7 @@ namespace MessagePipe
 
     public interface IAsyncRequestHandlerCore<in TRequest, TResponse> : IAsyncRequestHandler
     {
-        ValueTask<TResponse> InvokeAsync(TRequest request, CancellationToken cancellationToken = default);
+        UniTask<TResponse> InvokeAsync(TRequest request, CancellationToken cancellationToken = default);
     }
 
     public interface IAsyncRequestHandler<in TRequest, TResponse> : IAsyncRequestHandlerCore<TRequest, TResponse>
@@ -55,7 +56,7 @@ namespace MessagePipe
     public interface IRemoteRequestHandler<in TRequest, TResponse>
     // where TAsyncRequestHandler : IAsyncRequestHandler<TRequest, TResponse>
     {
-        ValueTask<TResponse> InvokeAsync(TRequest request, CancellationToken cancellationToken = default);
+        UniTask<TResponse> InvokeAsync(TRequest request, CancellationToken cancellationToken = default);
     }
 
     public class RemoteRequestException : Exception

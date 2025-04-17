@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
+using Channel = System.Threading.Channels.Channel;
 #if !UNITY_2018_3_OR_NEWER
 using System.Threading.Channels;
 #endif
@@ -98,7 +100,7 @@ namespace MessagePipe
 
     internal class AsyncMessageHandlerEnumerator<TMessage> : IAsyncEnumerator<TMessage>, IAsyncMessageHandler<TMessage>
     {
-        Channel<TMessage> channel;
+        System.Threading.Channels.Channel<TMessage> channel;
         CancellationToken cancellationToken;
         SingleAssignmentDisposable singleAssignmentDisposable;
 
@@ -135,7 +137,7 @@ namespace MessagePipe
             return channel.Reader.WaitToReadAsync(cancellationToken);
         }
 
-        ValueTask IAsyncMessageHandler<TMessage>.HandleAsync(TMessage message, CancellationToken cancellationToken)
+        UniTask IAsyncMessageHandler<TMessage>.HandleAsync(TMessage message, CancellationToken cancellationToken)
         {
             channel.Writer.TryWrite(message);
             return default;

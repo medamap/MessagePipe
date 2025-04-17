@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Xunit;
 
 namespace MessagePipe.Tests
@@ -99,7 +100,7 @@ namespace MessagePipe.Tests
         public TimeSpan DelaySpan { get; set; }
         public int ReceivedMessage { get; private set; }
 
-        public async ValueTask HandleAsync(int message, CancellationToken cancellationToken)
+        public async UniTask HandleAsync(int message, CancellationToken cancellationToken)
         {
             await Task.Delay(DelaySpan);
             ReceivedMessage = message;
@@ -110,7 +111,7 @@ namespace MessagePipe.Tests
     {
         public int ReceivedMessage { get; private set; }
 
-        public async ValueTask HandleAsync(int message, CancellationToken cancellationToken)
+        public async UniTask HandleAsync(int message, CancellationToken cancellationToken)
         {
             await Task.Delay(TimeSpan.FromMilliseconds(400));
             throw new WhenAllTestException();
@@ -121,7 +122,7 @@ namespace MessagePipe.Tests
     {
         public int ReceivedMessage { get; private set; }
 
-        public ValueTask HandleAsync(int message, CancellationToken cancellationToken)
+        public UniTask HandleAsync(int message, CancellationToken cancellationToken)
         {
             ReceivedMessage = message;
             return default;
@@ -133,7 +134,7 @@ namespace MessagePipe.Tests
     {
         public TimeSpan DelaySpan { get; set; }
 
-        public async ValueTask<int> InvokeAsync(int message, CancellationToken cancellationToken)
+        public async UniTask<int> InvokeAsync(int message, CancellationToken cancellationToken)
         {
             await Task.Delay(DelaySpan);
             return message * message;
@@ -142,7 +143,7 @@ namespace MessagePipe.Tests
 
     class ExceptionHandler2 : IAsyncRequestHandler<int, int>
     {
-        public async ValueTask<int> InvokeAsync(int message, CancellationToken cancellationToken)
+        public async UniTask<int> InvokeAsync(int message, CancellationToken cancellationToken)
         {
             await Task.Delay(TimeSpan.FromMilliseconds(400));
             throw new WhenAllTestException();
@@ -151,9 +152,9 @@ namespace MessagePipe.Tests
 
     class CompletedHandler2 : IAsyncRequestHandler<int, int>
     {
-        public ValueTask<int> InvokeAsync(int message, CancellationToken cancellationToken)
+        public UniTask<int> InvokeAsync(int message, CancellationToken cancellationToken)
         {
-            return ValueTask.FromResult(message * message);
+            return UniTask.FromResult(message * message);
         }
     }
 }
