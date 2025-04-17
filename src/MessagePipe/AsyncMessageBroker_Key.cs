@@ -37,6 +37,9 @@ namespace MessagePipe
 
         public IDisposable Subscribe(TKey key, IAsyncMessageHandler<TMessage> handler, params AsyncMessageHandlerFilter<TMessage>[] filters)
         {
+            #if MESSAGEPIPE_DEBUG
+            global::UnityEngine.Debug.Log($"[MessagePipe.AsyncMessageBroker_Key] core.Subscribe({key} : {typeof(TKey).FullName})");
+            #endif
             return core.Subscribe(key, handlerFactory.CreateAsyncMessageHandler(handler, filters));
         }
     }
@@ -95,13 +98,13 @@ namespace MessagePipe
                 if (handlers[i] == null)
                 {
                     #if MESSAGEPIPE_DEBUG
-                    global::UnityEngine.Debug.LogWarning($"[MessagePipe] Handler at index {i} is null");
+                    global::UnityEngine.Debug.LogWarning($"[MessagePipe.AsyncMessageBroker_Key] Handler at index {i} is null");
                     #endif
                     continue;
                 }
                 #if MESSAGEPIPE_DEBUG
                 // ハンドラー実行前にログ
-                global::UnityEngine.Debug.Log($"[MessagePipe] Executing handler {i} for key: {key}, message type: {typeof(TMessage).FullName}");
+                global::UnityEngine.Debug.Log($"[MessagePipe.AsyncMessageBroker_Key] Executing handler {i} for key: {key}, message type: {typeof(TMessage).FullName}");
                 #endif
                 handlers[i]?.HandleAsync(message, cancellationToken).Forget();
             }
@@ -148,6 +151,9 @@ namespace MessagePipe
 
                 if (!handlerGroup.TryGetValue(key, out var holder))
                 {
+                    #if MESSAGEPIPE_DEBUG
+                    global::UnityEngine.Debug.Log($"[MessagePipe.AsyncMessageBroker_Key] Register handlerGroup[{key}] = holder = new HandlerHolder(this);");
+                    #endif
                     handlerGroup[key] = holder = new HandlerHolder(this);
                 }
 

@@ -192,11 +192,17 @@ namespace MessagePipe.Interprocess
 
         public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, CancellationToken cancellationToken = default)
         {
+            #if MESSAGEPIPE_UDP_DEBUG
+            global::UnityEngine.Debug.Log($"[UdpDistributedPublisherSubscriber] 1 SubscribeAsync({key} : {typeof(TKey).FullName}, handler, Array.Empty<MessageHandlerFilter<TMessage>>(), cancellationToken)");
+            #endif
             return SubscribeAsync(key, handler, Array.Empty<MessageHandlerFilter<TMessage>>(), cancellationToken);
         }
 
         public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IMessageHandler<TMessage> handler, MessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
         {
+            #if MESSAGEPIPE_UDP_DEBUG
+            global::UnityEngine.Debug.Log($"[UdpDistributedPublisherSubscriber] 2 SubscribeCore({key} : {typeof(TKey).FullName}, transform)");
+            #endif
             handler = syncHandlerFactory.CreateMessageHandler(handler, filters);
             var transform = new TransformSyncMessageHandler<TMessage>(handler, options.MessagePackSerializerOptions);
             return SubscribeCore(key, transform);
@@ -204,11 +210,17 @@ namespace MessagePipe.Interprocess
 
         public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, CancellationToken cancellationToken = default)
         {
+            #if MESSAGEPIPE_UDP_DEBUG
+            global::UnityEngine.Debug.Log($"[UdpDistributedPublisherSubscriber] 3 SubscribeAsync({key} : {typeof(TKey).FullName}, handler, Array.Empty<AsyncMessageHandlerFilter<TMessage>>(), cancellationToken)");
+            #endif
             return SubscribeAsync(key, handler, Array.Empty<AsyncMessageHandlerFilter<TMessage>>(), cancellationToken);
         }
 
         public UniTask<IUniTaskAsyncDisposable> SubscribeAsync(TKey key, IAsyncMessageHandler<TMessage> handler, AsyncMessageHandlerFilter<TMessage>[] filters, CancellationToken cancellationToken = default)
         {
+            #if MESSAGEPIPE_UDP_DEBUG
+            global::UnityEngine.Debug.Log($"[UdpDistributedPublisherSubscriber] 4 SubscribeCore({key} : {typeof(TKey).FullName}, transform)");
+            #endif
             handler = asyncHandlerFactory.CreateAsyncMessageHandler(handler, filters);
             var transform = new TransformAsyncMessageHandler<TMessage>(handler, options.MessagePackSerializerOptions);
             return SubscribeCore(key, transform);
@@ -216,6 +228,9 @@ namespace MessagePipe.Interprocess
 
         UniTask<IUniTaskAsyncDisposable> SubscribeCore(TKey key, IAsyncMessageHandler<IInterprocessValue> handler)
         {
+            #if MESSAGEPIPE_UDP_DEBUG
+            global::UnityEngine.Debug.Log($"[UdpDistributedPublisherSubscriber] 5 subscriberCore.Subscribe({key} : {typeof(TKey).FullName}, byteKey, handler)");
+            #endif
             var byteKey = MessageBuilder.CreateKey(key, options.MessagePackSerializerOptions);
             var d = subscriberCore.Subscribe(byteKey, handler);
             return new UniTask<IUniTaskAsyncDisposable>(new AsyncDisposableBridge(d));
