@@ -1,8 +1,4 @@
-﻿#if !UNITY_2018_3_OR_NEWER
-#define UNITY_2018_3_OR_NEWER
-#endif
-
-using MessagePipe.Internal;
+﻿using MessagePipe.Internal;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -80,11 +76,7 @@ namespace MessagePipe
 
             for (int i = 0; i < handlers.Length; i++)
             {
-#if !UNITY_2018_3_OR_NEWER
                 handlers[i]?.HandleAsync(message, cancellationToken).Forget();
-#else
-                handlers[i]?.HandleAsync(message, cancellationToken).AsAsyncUnitUniTask().Forget();
-#endif
             }
         }
 

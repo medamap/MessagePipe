@@ -65,12 +65,7 @@ namespace MessagePipe
             var array = handlers.GetValues();
             for (int i = 0; i < array.Length; i++)
             {
-                #if !UNITY_2018_3_OR_NEWER
-                array[i]?.HandleAsync(message, cancellationToken).AsAsyncUnitUniTask().Forget();
-                #else
                 array[i]?.HandleAsync(message, cancellationToken).Forget();
-                #endif
-                
             }
         }
 

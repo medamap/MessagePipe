@@ -1,8 +1,4 @@
-﻿#if !UNITY_2018_3_OR_NEWER
-#define UNITY_2018_3_OR_NEWER
-#endif
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;

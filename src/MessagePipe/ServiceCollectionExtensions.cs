@@ -1,8 +1,4 @@
-﻿#if !UNITY_2018_3_OR_NEWER
-#define UNITY_2018_3_OR_NEWER
-#endif
-
-using MessagePipe;
+﻿using MessagePipe;
 using MessagePipe.Internal;
 #if !UNITY_2018_3_OR_NEWER
 using Microsoft.Extensions.DependencyInjection;
