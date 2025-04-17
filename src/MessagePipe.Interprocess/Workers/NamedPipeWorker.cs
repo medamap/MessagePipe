@@ -63,7 +63,13 @@ namespace MessagePipe.Interprocess.Workers
                 AllowSynchronousContinuations = true
             });
 #else
-            this.channel = Channel.CreateSingleConsumerUnbounded<byte[]>();
+            // 同じメソッドを使うが、SingleReaderをtrueに設定して単一コンシューマを模倣
+            this.channel = Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions()
+            {
+                SingleReader = true, // 単一コンシューマを指定
+                SingleWriter = false,
+                AllowSynchronousContinuations = true
+            });
 #endif
 
             if (options.HostAsServer != null && options.HostAsServer.Value)
